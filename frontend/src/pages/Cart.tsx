@@ -1,10 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
 
 const Cart = () => {
-  const { items, updateQuantity, removeFromCart, totalPrice } = useCart();
+  const navigate = useNavigate();
+  const { items, updateQuantity, removeFromCart, totalPrice, loading, error } = useCart();
+
+  if (error) {
+    return <div className="min-h-screen pt-32 text-center text-destructive">{error}</div>;
+  }
+
+  if (loading && items.length === 0) {
+    return <div className="min-h-screen pt-32 text-center text-muted-foreground">Loading your cart...</div>;
+  }
 
   if (items.length === 0) {
     return (
@@ -35,17 +44,17 @@ const Cart = () => {
                   <p className="text-sm text-muted-foreground mt-1">{item.product.category}</p>
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center glass rounded-lg">
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="p-2 text-muted-foreground hover:text-foreground">
+                      <button onClick={() => void updateQuantity(item.product.id, item.quantity - 1)} className="p-2 text-muted-foreground hover:text-foreground">
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="px-3 text-sm text-foreground">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="p-2 text-muted-foreground hover:text-foreground">
+                      <button onClick={() => void updateQuantity(item.product.id, item.quantity + 1)} className="p-2 text-muted-foreground hover:text-foreground">
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-semibold text-foreground">₹{(item.product.price * item.quantity).toLocaleString()}</span>
-                      <button onClick={() => removeFromCart(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <button onClick={() => void removeFromCart(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -68,7 +77,10 @@ const Cart = () => {
                 <span>Total</span><span>₹{totalPrice.toLocaleString()}</span>
               </div>
             </div>
-            <button className="w-full mt-6 px-6 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all">
+            <button
+              onClick={() => navigate("/checkout")}
+              className="w-full mt-6 px-6 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all"
+            >
               Proceed to Checkout
             </button>
             <Link to="/shop" className="block text-center text-sm text-primary mt-4 hover:underline">

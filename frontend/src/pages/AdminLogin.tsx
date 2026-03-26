@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { loginUser } from "@/services/authService";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -20,24 +21,13 @@ const AdminLogin = () => {
     setErrorMsg("");
 
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const data = await loginUser(email, password);
 
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", data.role);
-        
-        window.location.href = "/admin/dashboard";
-      } else {
-        setErrorMsg(data.message || "Admin authentication failed");
-      }
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      window.location.href = "/admin/dashboard";
     } catch (error: any) {
-      setErrorMsg(error.message || "Network error");
+      setErrorMsg(error?.response?.data?.message || error.message || "Network error");
     } finally {
       setIsLoading(false);
     }

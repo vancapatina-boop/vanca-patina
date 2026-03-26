@@ -5,14 +5,49 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "@/services/api";
+import { mapBackendProduct } from "@/lib/mapBackendProduct";
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const { products, loading } = useProducts();
-  const product = products.find((p) => p.id === id);
+  const { products } = useProducts();
   const { addToCart } = useCart();
+  const [product, setProduct] = useState<ReturnType<typeof mapBackendProduct> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .get(`/api/products/${id}`)
+      .then((res) => {
+        if (cancelled) return;
+        setProduct(mapBackendProduct(res.data));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e?.response?.data?.message ?? e?.message ?? "Failed to load product");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const related = useMemo(() => {
+    if (!product) return [];
+    return products
+      .filter((p) => p.category === product.category && p.id !== product.id)
+      .slice(0, 4);
+  }, [products, product]);
 
   if (loading) {
     return (
@@ -22,16 +57,14 @@ const ProductDetail = () => {
     );
   }
 
-  if (!product) {
+  if (error || !product) {
     return (
       <div className="min-h-screen pt-32 text-center">
-        <p className="text-muted-foreground">Product not found.</p>
+        <p className="text-muted-foreground">{error ?? "Product not found."}</p>
         <Link to="/shop" className="text-primary mt-4 inline-block">← Back to Shop</Link>
       </div>
     );
   }
-
-  const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -89,7 +122,7 @@ const ProductDetail = () => {
                 </button>
               </div>
               <button
-                onClick={() => { for (let i = 0; i < qty; i++) addToCart(product); }}
+                onClick={() => void addToCart(product, qty)}
                 className="flex-1 flex items-center justify-center gap-2 px-8 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all"
               >
                 <ShoppingBag className="w-5 h-5" /> Add to Cart

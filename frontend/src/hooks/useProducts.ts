@@ -1,37 +1,39 @@
-import { useState, useEffect } from 'react';
-import { Product, products as fallbackProducts } from '@/data/products';
-import defaultProductImage from '@/assets/default-product.jpg';
+import { useEffect, useState } from "react";
+import { Product } from "@/types/product";
+import api from "@/services/api";
+import { mapBackendProduct } from "@/lib/mapBackendProduct";
 
 export const useProducts = () => {
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/products')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped = data.map((item: any) => ({
-            id: item._id,
-            name: item.name,
-            price: item.price,
-            originalPrice: item.originalPrice || item.price * 1.2,
-            description: item.description || "Premium metal finish solution.",
-            shortDescription: item.description?.substring(0, 50) || "Premium finish",
-            category: item.category || "General",
-            finishType: item.category || "Standard",
-            image: item.image || defaultProductImage,
-            rating: item.rating || 5,
-            reviews: item.reviews || 24,
-            inStock: true,
-            badge: item.badge || undefined
-          }));
-          setProducts(mapped);
-        }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    api
+      .get("/api/products", { params: { pageNumber: 1, pageSize: 200 } })
+      .then((res) => {
+        const payload = res.data;
+        const list = payload?.products ?? payload ?? [];
+        if (!Array.isArray(list)) return;
+        if (cancelled) return;
+        setProducts(list.map(mapBackendProduct));
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        const msg = e?.response?.data?.message ?? e?.message ?? "Failed to load products";
+        if (!cancelled) setError(msg);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { products, loading };
+  return { products, loading, error };
 };

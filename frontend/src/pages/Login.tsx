@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { loginUser, registerUser } from "@/services/authService";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -21,32 +22,20 @@ const Login = () => {
     setIsLoading(true);
     setErrorMsg("");
 
-    const endpoint = isSignup ? "/api/auth/register" : "/api/auth/login";
     const body = isSignup ? { name, email, password } : { email, password };
 
     try {
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const data = isSignup
+        ? await registerUser(body.name, body.email, body.password)
+        : await loginUser(body.email, body.password);
 
-      const data = await response.json();
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
 
-      if (response.ok) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", data.role);
-
-        if (data.role === 'admin') {
-          window.location.href = "/admin/dashboard";
-        } else {
-          window.location.href = "/";
-        }
-      } else {
-        setErrorMsg(data.message || "Authentication failed");
-      }
+      if (data.role === "admin") window.location.href = "/admin/dashboard";
+      else window.location.href = "/";
     } catch (error: any) {
-      setErrorMsg(error.message || "Network error");
+      setErrorMsg(error?.response?.data?.message || error.message || "Network error");
     } finally {
       setIsLoading(false);
     }

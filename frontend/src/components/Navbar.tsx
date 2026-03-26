@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { logoutUser } from "@/services/authService";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -29,6 +30,7 @@ const Navbar = () => {
   const isLoggedIn = !!token;
 
   const handleLogout = () => {
+    void logoutUser().catch(() => {});
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     window.location.href = "/login";

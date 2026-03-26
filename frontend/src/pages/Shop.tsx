@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { categories } from "@/data/products";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
@@ -14,12 +13,16 @@ const sortOptions = [
 ];
 
 const Shop = () => {
-  const { products, loading } = useProducts();
+  const { products, loading, error } = useProducts();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedFinish, setSelectedFinish] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [showFilters, setShowFilters] = useState(false);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
+  }, [products]);
 
   const finishTypes = useMemo(() => {
     return [...new Set(products.map((p) => p.finishType))];
@@ -51,6 +54,9 @@ const Shop = () => {
           <div className="flex justify-center items-center py-20 text-xl font-medium animate-pulse text-zinc-400">
             Syncing catalog securely from Database...
           </div>
+        )}
+        {error && !loading && (
+          <div className="text-center py-10 text-destructive">{error}</div>
         )}
 
         {/* Search & Filters bar */}
@@ -89,7 +95,7 @@ const Shop = () => {
               <div>
                 <h4 className="font-semibold text-foreground mb-3 text-sm">Category</h4>
                 <div className="flex flex-col gap-2">
-                  {["All", ...categories.map((c) => c.name)].map((cat) => (
+                  {["All", ...categories].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}

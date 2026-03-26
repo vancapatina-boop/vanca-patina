@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ShoppingBag, Star } from "lucide-react";
-import { Product } from "@/data/products";
+import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
 
@@ -51,7 +51,7 @@ const ProductCard = ({ product }: { product: Product }) => {
             )}
           </div>
           <button
-            onClick={() => addToCart(product)}
+            onClick={() => void addToCart(product)}
             className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
           >
             <ShoppingBag className="w-4 h-4" />

@@ -2,10 +2,10 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Shield, Sparkles, Award, Star, Send } from "lucide-react";
 import { motion } from "framer-motion";
 import heroImage from "@/assets/hero-patina.jpg";
-import { categories } from "@/data/products";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
+import { useMemo } from "react";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -16,6 +16,15 @@ const fadeUp = {
 
 const Index = () => {
   const { products, loading } = useProducts();
+  const categories = useMemo(() => {
+    const counts = products.reduce((acc: Record<string, number>, p) => {
+      acc[p.category] = (acc[p.category] ?? 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .slice(0, 4);
+  }, [products]);
 
   return (
     <div className="min-h-screen">
@@ -99,7 +108,7 @@ const Index = () => {
                 <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
                   {cat.name}
                 </h3>
-                <p className="text-sm text-muted-foreground mt-2">{cat.description}</p>
+                <p className="text-sm text-muted-foreground mt-2">Explore our full range in this category.</p>
                 <span className="text-xs text-primary mt-4 inline-block">{cat.count} products →</span>
               </Link>
             </motion.div>
