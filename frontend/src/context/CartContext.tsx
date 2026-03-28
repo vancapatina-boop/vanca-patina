@@ -78,8 +78,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setError(null);
-    await api.post("/api/cart", { productId: product.id, qty });
-    await syncCart();
+    try {
+      await api.post("/api/cart", { productId: product.id, qty });
+      await syncCart();
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
+      setError(message);
+      throw error;
+    }
   }, [syncCart]);
 
   const removeFromCart = useCallback(async (productId: string) => {

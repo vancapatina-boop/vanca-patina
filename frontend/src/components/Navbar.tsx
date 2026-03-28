@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ShoppingBag, Menu, X, Search, User, UserCircle, Package, LogOut } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DropdownMenu,
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { logoutUser } from "@/services/authService";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -23,17 +23,18 @@ const navLinks = [
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
+  const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
-  const isLoggedIn = !!token;
-
-  const handleLogout = () => {
-    void logoutUser().catch(() => {});
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      // Handle logout error if needed
+      navigate("/");
+    }
   };
 
   return (
@@ -70,7 +71,7 @@ const Navbar = () => {
               <Search className="w-[1.15rem] h-[1.15rem]" />
             </Link>
 
-            {!isLoggedIn ? (
+            {!isAuthenticated ? (
               <Link to="/login" className="hover:text-primary transition-colors hover:scale-110 duration-300">
                 <User className="w-[1.15rem] h-[1.15rem]" />
               </Link>

@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { loginUser } from "@/services/authService";
+import api from "@/services/api";
+import { toast } from "sonner";
 
 const AdminLogin = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,14 +23,22 @@ const AdminLogin = () => {
     setErrorMsg("");
 
     try {
-      const data = await loginUser(email, password);
+      console.log("🔐 Admin login attempt:", { email });
+      const response = await api.post("/api/auth/admin-login", { email, password });
 
-      localStorage.setItem("token", data.token);
-      if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
-      localStorage.setItem("role", data.role);
-      window.location.href = "/admin/dashboard";
+      localStorage.setItem("token", response.data.token);
+      if (response.data.refreshToken) localStorage.setItem("refreshToken", response.data.refreshToken);
+      localStorage.setItem("role", response.data.role);
+      localStorage.setItem("adminName", response.data.name);
+
+      toast.success("Admin login successful!");
+      console.log("✅ Admin authenticated");
+      navigate("/admin/dashboard");
     } catch (error: any) {
-      setErrorMsg(error?.response?.data?.message || error.message || "Network error");
+      const message = error?.response?.data?.message || error?.message || "Login failed";
+      setErrorMsg(message);
+      toast.error(message);
+      console.error("❌ Admin login error:", error);
     } finally {
       setIsLoading(false);
     }

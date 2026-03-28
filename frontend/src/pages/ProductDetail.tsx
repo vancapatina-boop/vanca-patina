@@ -1,6 +1,7 @@
-import { useParams, Link } from "react-router-dom";
-import { ShoppingBag, Star, ArrowLeft, ShieldCheck, Droplets, Minus, Plus } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ShoppingBag, Star, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
@@ -8,15 +9,19 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import api from "@/services/api";
 import { mapBackendProduct } from "@/lib/mapBackendProduct";
+import { toast } from "sonner";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { products } = useProducts();
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [product, setProduct] = useState<ReturnType<typeof mapBackendProduct> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +53,35 @@ const ProductDetail = () => {
       .filter((p) => p.category === product.category && p.id !== product.id)
       .slice(0, 4);
   }, [products, product]);
+
+  const handleAddToCart = async () => {
+    // Prevent null product
+    if (!product) {
+      toast.error("Product not available");
+      return;
+    }
+
+    // 🔐 Check authentication
+    if (!isAuthenticated) {
+      toast.error("Please login to add items to cart");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setIsAddingToCart(true);
+      console.log("🛒 Adding to cart:", { productId: product.id, productName: product.name, qty });
+      await addToCart(product, qty);
+      toast.success(`${product.name} added to cart!`);
+      setQty(1); // Reset quantity after successful add
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
+      toast.error(message);
+      console.error("🛒 Add to cart error:", error);
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -113,19 +147,28 @@ const ProductDetail = () => {
             {/* Qty + Add to Cart */}
             <div className="flex items-center gap-4 mt-8">
               <div className="flex items-center glass rounded-lg">
-                <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-3 text-muted-foreground hover:text-foreground">
+                <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-3 text-muted-foreground hover:text-foreground" disabled={isAddingToCart}>
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="px-4 text-foreground font-semibold">{qty}</span>
-                <button onClick={() => setQty(qty + 1)} className="p-3 text-muted-foreground hover:text-foreground">
+                <button onClick={() => setQty(qty + 1)} className="p-3 text-muted-foreground hover:text-foreground" disabled={isAddingToCart}>
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
               <button
-                onClick={() => void addToCart(product, qty)}
-                className="flex-1 flex items-center justify-center gap-2 px-8 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all"
+                onClick={handleAddToCart}
+                disabled={isAddingToCart}
+                className="flex-1 flex items-center justify-center gap-2 px-8 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <ShoppingBag className="w-5 h-5" /> Add to Cart
+                {isAddingToCart ? (
+                  <>
+                    <Loader className="w-5 h-5 animate-spin" /> Adding...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="w-5 h-5" /> Add to Cart
+                  </>
+                )}
               </button>
             </div>
 

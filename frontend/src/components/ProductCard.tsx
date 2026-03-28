@@ -1,11 +1,38 @@
-import { Link } from "react-router-dom";
-import { ShoppingBag, Star } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ShoppingBag, Star, Loader } from "lucide-react";
 import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const ProductCard = ({ product }: { product: Product }) => {
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleAddToCart = async () => {
+    // 🔐 Check authentication
+    if (!isAuthenticated) {
+      toast.error("Please login to add items to cart");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await addToCart(product);
+      toast.success(`${product.name} added to cart!`);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
+      toast.error(message);
+      console.error("🛒 Add to cart error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -51,10 +78,15 @@ const ProductCard = ({ product }: { product: Product }) => {
             )}
           </div>
           <button
-            onClick={() => void addToCart(product)}
-            className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+            onClick={handleAddToCart}
+            disabled={isLoading}
+            className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <ShoppingBag className="w-4 h-4" />
+            {isLoading ? (
+              <Loader className="w-4 h-4 animate-spin" />
+            ) : (
+              <ShoppingBag className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>

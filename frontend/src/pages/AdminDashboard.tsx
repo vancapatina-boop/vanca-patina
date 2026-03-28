@@ -93,7 +93,7 @@ const AdminDashboard = () => {
     setProductsLoading(true);
     setProductsError(null);
     try {
-      const res = await api.get("/api/products", { params: { pageNumber: 1, pageSize: 200 } });
+      const res = await api.get("/api/admin/products", { params: { page: 1, limit: 100 } });
       const payload = res.data;
       const list = payload?.products ?? payload ?? [];
       setProducts(Array.isArray(list) ? list : []);

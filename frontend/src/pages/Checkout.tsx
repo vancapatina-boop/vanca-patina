@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/context/CartContext";
-import { checkoutOrder } from "@/services/ordersService";
+import { checkoutOrder, createPaymentOrder, verifyPayment } from "@/services/ordersService";
+import "@/types/razorpay";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ const Checkout = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   const [shippingAddress, setShippingAddress] = useState({
     address: "",
@@ -17,7 +19,20 @@ const Checkout = () => {
     country: "India",
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<"PayPal" | "COD">("PayPal");
+  const [paymentMethod, setPaymentMethod] = useState<"PayPal" | "COD" | "Razorpay">("Razorpay");
+
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => setRazorpayLoaded(true);
+    script.onerror = () => console.error('Failed to load Razorpay script');
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const canSubmit = useMemo(() => items.length > 0 && !isSubmitting, [items.length, isSubmitting]);
 
@@ -29,10 +44,57 @@ const Checkout = () => {
     setErrorMsg(null);
 
     try {
-      await checkoutOrder({ shippingAddress, paymentMethod });
-      clearCart();
-      await syncCart();
-      navigate("/orders");
+      if (paymentMethod === 'Razorpay') {
+        // Handle Razorpay payment
+        if (!razorpayLoaded) {
+          throw new Error('Razorpay is not loaded yet. Please try again.');
+        }
+
+        // Create Razorpay order
+        const orderData = await createPaymentOrder();
+
+        const options = {
+          key: orderData.key,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          order_id: orderData.orderId,
+          name: 'Vanca Patina',
+          description: 'Purchase from Vanca Patina',
+          handler: async (response: any) => {
+            try {
+              // Verify payment on backend
+              await verifyPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                orderData: { shippingAddress },
+              });
+
+              clearCart();
+              await syncCart();
+              navigate("/orders");
+            } catch (verifyError: any) {
+              setErrorMsg(verifyError?.response?.data?.message ?? 'Payment verification failed');
+            }
+          },
+          prefill: {
+            email: '', // You can get this from user context if available
+            contact: '',
+          },
+          theme: {
+            color: '#8B4513', // Copper color to match theme
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        // Handle COD/PayPal
+        await checkoutOrder({ shippingAddress, paymentMethod });
+        clearCart();
+        await syncCart();
+        navigate("/orders");
+      }
     } catch (e: any) {
       setErrorMsg(e?.response?.data?.message ?? e?.message ?? "Checkout failed");
     } finally {
@@ -103,6 +165,15 @@ const Checkout = () => {
                   <button
                     type="button"
                     className={`px-4 py-3 rounded-lg border transition-colors ${
+                      paymentMethod === "Razorpay" ? "bg-primary/15 border-primary" : "bg-secondary/40 border-border"
+                    }`}
+                    onClick={() => setPaymentMethod("Razorpay")}
+                  >
+                    Razorpay
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-3 rounded-lg border transition-colors ${
                       paymentMethod === "PayPal" ? "bg-primary/15 border-primary" : "bg-secondary/40 border-border"
                     }`}
                     onClick={() => setPaymentMethod("PayPal")}
@@ -132,7 +203,7 @@ const Checkout = () => {
                 disabled={!canSubmit}
                 className="w-full mt-2 px-6 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all disabled:opacity-60"
               >
-                {isSubmitting ? "Placing Order..." : "Place Order"}
+                {isSubmitting ? "Processing..." : paymentMethod === 'Razorpay' ? "Pay with Razorpay" : "Place Order"}
               </button>
             </form>
           </div>
