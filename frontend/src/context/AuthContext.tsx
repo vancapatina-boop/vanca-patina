@@ -1,37 +1,39 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  role: string;
-}
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import type {
+  AuthResponse,
+  AuthUser,
+  RegisterPayload,
+  RegisterResponse,
+} from "@/services/authService";
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-const storeAuth = (data: { accessToken: string; refreshToken?: string; _id: string; name: string; email: string; role: string }) => {
+const storeAuth = (data: AuthResponse) => {
   localStorage.setItem("token", data.accessToken);
   if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
   localStorage.setItem("role", data.role);
-  // Persist user info so page refresh doesn't lose identity
-  localStorage.setItem("user", JSON.stringify({
-    _id: data._id,
-    name: data.name,
-    email: data.email,
-    role: data.role,
-  }));
+  localStorage.setItem(
+    "user",
+    JSON.stringify({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      phone: data.phone || "",
+      role: data.role,
+      isVerified: data.isVerified,
+    })
+  );
 };
 
 const clearAuth = () => {
@@ -41,30 +43,46 @@ const clearAuth = () => {
   localStorage.removeItem("user");
 };
 
-// ─── provider ───────────────────────────────────────────────────────────────
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!token && !!user;
 
-  // Restore auth state from localStorage on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        clearAuth();
-      }
+  const refreshUser = useCallback(async () => {
+    const { getCurrentUser } = await import("@/services/authService");
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    localStorage.setItem("user", JSON.stringify(currentUser));
+    const latestToken = localStorage.getItem("token");
+    if (latestToken) {
+      setToken(latestToken);
     }
-    setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    const bootstrapAuth = async () => {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+
+      if (storedToken && storedUser) {
+        try {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+          await refreshUser();
+        } catch {
+          clearAuth();
+          setToken(null);
+          setUser(null);
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    bootstrapAuth();
+  }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     const { loginUser } = await import("@/services/authService");
@@ -72,16 +90,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     storeAuth(data);
     setToken(data.accessToken);
-    setUser({ _id: data._id, name: data.name, email: data.email, role: data.role });
+    setUser({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      phone: data.phone || "",
+      role: data.role,
+      isVerified: data.isVerified,
+    });
   }, []);
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
+  const register = useCallback(async (payload: RegisterPayload) => {
     const { registerUser } = await import("@/services/authService");
-    const data = await registerUser(name, email, password);
-
-    storeAuth(data);
-    setToken(data.accessToken);
-    setUser({ _id: data._id, name: data.name, email: data.email, role: data.role });
+    return await registerUser(payload);
   }, []);
 
   const logout = useCallback(async () => {
@@ -89,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { logoutUser } = await import("@/services/authService");
       await logoutUser();
     } catch {
-      // Ignore — we clear local state regardless
+      // Clear local state even if the API call fails.
     }
 
     clearAuth();
@@ -97,17 +118,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
-  const value: AuthContextType = {
-    user,
-    token,
-    isAuthenticated,
-    isLoading,
-    login,
-    register,
-    logout,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isAuthenticated,
+        isLoading,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

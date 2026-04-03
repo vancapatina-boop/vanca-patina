@@ -17,6 +17,7 @@ const {
   getUserById,
   deleteUser,
 } = require('../controllers/adminController');
+const { getInvoiceForAdmin, downloadInvoiceForAdmin } = require('../controllers/invoiceController');
 const { protect, admin } = require('../middleware/authMiddleware');
 const validate = require('../validators/validate');
 const {
@@ -42,6 +43,12 @@ router.route('/orders/:id')
     validate(updateOrderStatusSchema),
     updateOrderStatus
   );
+
+router.route('/invoice/:orderId')
+  .get(protect, admin, getInvoiceForAdmin);
+
+router.route('/invoice/:orderId/download')
+  .get(protect, admin, downloadInvoiceForAdmin);
 
 // ==================== PRODUCTS ====================
 // Image upload (must be declared BEFORE /:id to avoid 'upload' being treated as an id)

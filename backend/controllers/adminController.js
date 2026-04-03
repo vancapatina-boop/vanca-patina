@@ -5,6 +5,7 @@ const User  = require('../models/User');
 const Product = require('../models/product');
 const asyncHandler = require('../utils/asyncHandler');
 const { hasCloudinary, uploadToCloudinary, deleteFromCloudinary, getPublicId } = require('../config/cloudinary');
+const { ensureInvoiceForOrder } = require('../services/invoiceService');
 
 // ==================== DASHBOARD ====================
 
@@ -62,12 +63,17 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   const transitions = {
-    pending: ["processing", "cancelled"],
-    processing: ["shipped", "cancelled"],
+    pending: ["confirmed", "processing", "cancelled"],
+    confirmed: ["processing", "shipped", "delivered", "cancelled"],
+    processing: ["shipped", "delivered", "cancelled"],
     shipped: ["delivered"],
     delivered: [],
     cancelled: [],
   };
+
+  if (order.status === status) {
+    return res.json(order);
+  }
 
   if (!transitions[order.status].includes(status)) {
     const err = new Error("Invalid status transition");
@@ -79,6 +85,15 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   if (status === "delivered") {
     order.isPaid = true;
     order.paidAt = order.paidAt || Date.now();
+    if (order.paymentMethod === 'COD' && order.paymentStatus !== 'paid') {
+      order.paymentStatus = 'paid';
+      order.paymentResult = {
+        ...(order.paymentResult || {}),
+        status: 'completed',
+        update_time: new Date().toISOString(),
+        email_address: order.customerSnapshot?.email,
+      };
+    }
   }
 
   if (status === "cancelled") {
@@ -91,6 +106,9 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   const updatedOrder = await order.save();
+  if (status === 'delivered') {
+    await ensureInvoiceForOrder(updatedOrder._id, { notifyCustomer: true });
+  }
   res.json(updatedOrder);
 });
 

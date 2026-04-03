@@ -7,10 +7,21 @@ const {
   logoutUser,
   refreshToken,
   adminLogin,
+  verifyEmail,
+  resendVerificationEmail,
+  forgotPassword,
+  resetPassword,
+  getCurrentUser,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const validate = require('../validators/validate');
-const { registerSchema, loginSchema } = require('../validators/schemas');
+const {
+  registerSchema,
+  loginSchema,
+  resendVerificationSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} = require('../validators/schemas');
 
 // Rate limit for login attempts (5 attempts per 15 minutes)
 const loginLimiter = rateLimit({
@@ -33,6 +44,11 @@ const registerLimiter = rateLimit({
 router.post('/register', registerLimiter, validate(registerSchema), registerUser);
 router.post('/login', loginLimiter, validate(loginSchema), authUser);
 router.post('/admin-login', loginLimiter, validate(loginSchema), adminLogin);
+router.get('/me', protect, getCurrentUser);
+router.get('/verify-email/:token', verifyEmail);
+router.post('/resend-verification', loginLimiter, validate(resendVerificationSchema), resendVerificationEmail);
+router.post('/forgot-password', loginLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', loginLimiter, validate(resetPasswordSchema), resetPassword);
 router.post('/logout', protect, logoutUser);
 router.post('/refresh', refreshToken);
 

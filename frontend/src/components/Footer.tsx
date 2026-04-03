@@ -23,11 +23,21 @@ const Footer = () => (
         </div>
         <div>
           <h4 className="font-semibold mb-4 text-foreground">Legal</h4>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <span>Privacy Policy</span>
-            <span>Terms & Conditions</span>
-            <span>Refund Policy</span>
-            <span>Shipping Policy</span>
+          <div className="flex flex-col gap-2">
+            {[
+              { to: "/privacy-policy", label: "Privacy Policy" },
+              { to: "/terms-and-conditions", label: "Terms & Conditions" },
+              { to: "/refund-policy", label: "Refund Policy" },
+              { to: "/shipping-policy", label: "Shipping Policy" },
+            ].map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
         <div>

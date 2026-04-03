@@ -5,6 +5,6 @@ const wishlistSchema = new mongoose.Schema({
   products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
 }, { timestamps: true });
 
-wishlistSchema.index({ user: 1 });
+
 
 module.exports = mongoose.model('Wishlist', wishlistSchema);

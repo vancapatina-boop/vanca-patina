@@ -5,15 +5,48 @@ const objectIdSchema = z
   .string()
   .refine((val) => mongoose.Types.ObjectId.isValid(val), { message: "Invalid id" });
 
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(72, "Password must be at most 72 characters")
+  .regex(/[A-Z]/, "Password must include at least one uppercase letter")
+  .regex(/[a-z]/, "Password must include at least one lowercase letter")
+  .regex(/\d/, "Password must include at least one number")
+  .regex(/[^A-Za-z0-9]/, "Password must include at least one special character");
+
 const registerSchema = z.object({
   name: z.string().min(2).max(100).transform((s) => s?.trim()),
   email: z.string().email().max(254).transform((s) => s?.trim().toLowerCase()),
-  password: z.string().min(8).max(72),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+  acceptTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the terms and privacy policy" }),
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 const loginSchema = z.object({
-  email: z.string().email().transform((s) => s?.trim().toLowerCase()),
+  email: z.string().email().max(254).transform((s) => s?.trim().toLowerCase()),
   password: z.string().min(1),
+});
+
+const resendVerificationSchema = z.object({
+  email: z.string().email().transform((s) => s?.trim().toLowerCase()),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email().max(254).transform((s) => s?.trim().toLowerCase()),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(32).max(512),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 const sendOtpSchema = z.object({
@@ -43,9 +76,9 @@ const productBaseSchema = z.object({
   name: z.string().min(2).max(200).transform((s) => s?.trim()),
   price: z.coerce.number().nonnegative(),
   category: z.string().min(1).max(100).transform((s) => s?.trim()),
-  description: z.string().min(10).max(5000).transform((s) => s?.trim()),
+  description: z.string().min(5).max(5000).transform((s) => s?.trim()),
   stock: z.coerce.number().int().nonnegative(),
-  finishType: z.enum(["Matte", "Glossy", "Satin", "Standard"]).default("Standard").optional(),
+  finishType: z.enum(["Matte", "Glossy", "Satin", "Standard", "Antique", "Brushed", "Polished", "Textured", "Metallic", "Clear Coat"]).default("Standard").optional(),
   image: z.string().optional().nullable(),
   images: z.array(z.string()).optional().nullable(),
   ratings: z.coerce.number().nonnegative().optional(),
@@ -114,11 +147,22 @@ const addressSchema = z.object({
 
 const checkoutSchema = z.object({
   shippingAddress: addressSchema,
-  paymentMethod: z.enum(["PayPal", "COD"]).default("PayPal"),
+  paymentMethod: z.enum(["PayPal", "COD", "Razorpay"]).default("PayPal"),
+});
+
+const createPaymentOrderSchema = z.object({
+  shippingAddress: addressSchema,
+});
+
+const verifyPaymentSchema = z.object({
+  appOrderId: objectIdSchema,
+  razorpay_order_id: z.string().min(1),
+  razorpay_payment_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
 });
 
 const updateOrderStatusSchema = z.object({
-  status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"]),
+  status: z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]),
 });
 
 const uploadProductImageSchema = z.object({
@@ -132,9 +176,12 @@ const idParamSchema = z.object({
 module.exports = {
   registerSchema,
   loginSchema,
+  resendVerificationSchema,
   sendOtpSchema,
   verifyOtpSchema,
   setPasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   updateProfileSchema,
   createProductSchema,
   updateProductSchema,
@@ -142,9 +189,10 @@ module.exports = {
   addToCartSchema,
   updateCartSchema,
   checkoutSchema,
+  createPaymentOrderSchema,
+  verifyPaymentSchema,
   addressSchema,
   updateOrderStatusSchema,
   uploadProductImageSchema,
   idParamSchema,
 };
-

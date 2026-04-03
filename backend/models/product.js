@@ -28,7 +28,7 @@ const productSchema = new mongoose.Schema({
   },
   finishType: {
     type: String,
-    enum: ["Matte", "Glossy", "Satin", "Standard"],
+    enum: ["Matte", "Glossy", "Satin", "Standard", "Antique", "Brushed", "Polished", "Textured", "Metallic", "Clear Coat"],
     default: "Standard"
   },
   ratings: {

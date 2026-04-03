@@ -36,7 +36,8 @@ const getProducts = asyncHandler(async (req, res) => {
   const products = await Product.find(filter)
     .sort(sortConfig)
     .limit(pageSize)
-    .skip(pageSize * (pageNumber - 1));
+    .skip(pageSize * (pageNumber - 1))
+    .lean();
 
   res.json({ products, page: pageNumber, pages: Math.ceil(total / pageSize), total });
 });
@@ -45,7 +46,7 @@ const getProducts = asyncHandler(async (req, res) => {
 // @route   GET /api/products/:id
 // @access  Public
 const getProductById = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findById(req.params.id).lean();
   if (!product) {
     const err = new Error("Product not found");
     err.statusCode = 404;

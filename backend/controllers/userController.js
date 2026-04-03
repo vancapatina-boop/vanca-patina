@@ -1,6 +1,5 @@
 const User = require('../models/User');
 const asyncHandler = require("../utils/asyncHandler");
-const generateToken = require("../utils/generateToken");
 
 // Auth endpoints moved to `controllers/authController.js`
 
@@ -8,7 +7,7 @@ const generateToken = require("../utils/generateToken");
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user.id).lean();
   if (!user) {
     const err = new Error("User not found");
     err.statusCode = 404;
@@ -48,12 +47,12 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     email: updatedUser.email,
     phone: updatedUser.phone,
     role: updatedUser.role,
-    token: generateToken(updatedUser.id),
+    isVerified: updatedUser.isVerified,
   });
 });
 
 const getUserAddresses = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user.id).lean();
   if (!user) {
     const err = new Error("User not found");
     err.statusCode = 404;

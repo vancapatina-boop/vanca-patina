@@ -28,7 +28,11 @@ const UserSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpiry: { type: Date },
   otpAttempts: { type: Number, default: 0 },
-  isVerified: { type: Boolean, default: true },  // set false when email verification is enabled
+  isVerified: { type: Boolean, default: false },
+  verificationTokenHash: { type: String, default: null },
+  verificationTokenExpires: { type: Date, default: null },
+  passwordResetTokenHash: { type: String, default: null },
+  passwordResetTokenExpires: { type: Date, default: null },
   isBlocked: { type: Boolean, default: false },
 }, { timestamps: true });
 

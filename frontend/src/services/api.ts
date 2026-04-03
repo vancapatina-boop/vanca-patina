@@ -1,7 +1,20 @@
 import axios from "axios";
 
+const resolveApiBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  // In local/LAN development we prefer Vite proxying /api to the backend.
+  // In same-origin production deployments this also works without extra config.
+  return "";
+};
+
+const apiBaseUrl = resolveApiBaseUrl();
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },
@@ -18,6 +31,13 @@ api.interceptors.request.use((config) => {
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
+
+const clearStoredAuth = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("role");
+  localStorage.removeItem("user");
+};
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -52,7 +72,8 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem("refreshToken");
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, { refreshToken }, { withCredentials: true });
+        const refreshUrl = apiBaseUrl ? `${apiBaseUrl}/api/auth/refresh` : "/api/auth/refresh";
+        const response = await axios.post(refreshUrl, { refreshToken });
         // Backend returns 'accessToken', not 'token'
         const { accessToken, refreshToken: newRefreshToken } = response.data;
         localStorage.setItem("token", accessToken);
@@ -65,8 +86,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
+        clearStoredAuth();
         window.location.href = "/login";
         return Promise.reject(err);
       } finally {
@@ -79,4 +99,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-

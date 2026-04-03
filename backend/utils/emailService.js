@@ -1,24 +1,8 @@
-const nodemailer = require('nodemailer');
-
-// Create transporter
-const createTransporter = () => {
-  return nodemailer.createTransporter({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-};
+const sendEmail = require('./sendEmail');
 
 // Send OTP email
 const sendOtpEmail = async (email, otp) => {
-  const transporter = createTransporter();
-
-  const mailOptions = {
-    from: `"${process.env.FROM_NAME || 'Vanca Patina'}" <${process.env.SMTP_USER}>`,
+  await sendEmail({
     to: email,
     subject: 'Your OTP for Vanca Patina',
     html: `
@@ -34,9 +18,38 @@ const sendOtpEmail = async (email, otp) => {
         <p style="color: #666; font-size: 12px;">This is an automated message. Please do not reply.</p>
       </div>
     `,
-  };
-
-  await transporter.sendMail(mailOptions);
+  });
 };
 
-module.exports = { sendOtpEmail };
+const sendInvoiceEmail = async ({
+  email,
+  customerName,
+  invoiceNumber,
+  invoiceUrl,
+  orderId,
+}) => {
+  await sendEmail({
+    to: email,
+    subject: `Your invoice ${invoiceNumber} is ready`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #1f2937;">
+        <h2 style="margin-bottom: 16px;">Invoice Ready</h2>
+        <p>Hello ${customerName},</p>
+        <p>Your invoice for order <strong>${orderId}</strong> is now available.</p>
+        <p style="margin: 24px 0;">
+          <a
+            href="${invoiceUrl}"
+            style="display: inline-block; background: #1f2937; color: white; text-decoration: none; padding: 12px 18px; border-radius: 8px;"
+          >
+            Download Invoice
+          </a>
+        </p>
+        <p>Invoice Number: <strong>${invoiceNumber}</strong></p>
+        <p style="color: #6b7280; font-size: 13px;">If the button does not work, copy this link into your browser: ${invoiceUrl}</p>
+      </div>
+    `,
+    text: `Your invoice ${invoiceNumber} for order ${orderId} is ready: ${invoiceUrl}`,
+  });
+};
+
+module.exports = { sendOtpEmail, sendInvoiceEmail };

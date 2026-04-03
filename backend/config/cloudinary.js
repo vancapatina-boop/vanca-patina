@@ -57,10 +57,10 @@ function uploadToCloudinary(source, options = {}) {
  * Safely ignores missing images (not-found) so product deletes don't fail.
  * @param {string} publicId
  */
-async function deleteFromCloudinary(publicId) {
+async function deleteFromCloudinary(publicId, options = {}) {
   if (!hasCloudinary || !publicId) return;
   try {
-    await cloudinary.uploader.destroy(publicId);
+    await cloudinary.uploader.destroy(publicId, options);
   } catch (err) {
     console.error("Cloudinary delete error:", err.message);
   }

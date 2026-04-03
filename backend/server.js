@@ -6,29 +6,16 @@ const mongoose = require("mongoose");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
-// const mongoSanitize = require("express-mongo-sanitize");
-// const xssClean = require("xss-clean");
+
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
+const { handleRazorpayWebhook } = require('./controllers/paymentController');
 
 const app = express();
 
 app.disable("x-powered-by");
 
 app.use(cookieParser());
-
-// Handle OPTIONS requests before security middlewares
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
 
 // Security headers
 app.use(helmet());
@@ -46,10 +33,7 @@ app.use(
   })
 );
 
-// Input sanitization - REMOVED deprecated express-mongo-sanitize and xss-clean
-// These packages are incompatible with Express 5.x and should be replaced with proper input validation
-// app.use(mongoSanitize());
-// app.use(xssClean());
+// express-mongo-sanitize was removed as it is incompatible with Express 5.x
 
 // CORS: strict in production; permissive in development.
 // This prevents "Network Error" in the browser when Vite is opened via a LAN IP.
@@ -57,19 +41,40 @@ const clientOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",").map((s) => s.trim())
   : [];
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+const isLanOrigin = (origin) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (!["http:", "https:"].includes(protocol)) {
+      return false;
+    }
+
+    return (
+      /^127\.\d+\.\d+\.\d+$/.test(hostname) ||
+      /^10\.\d+\.\d+\.\d+$/.test(hostname) ||
+      /^192\.168\.\d+\.\d+$/.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    // In development, allow localhost origins
-    if (process.env.NODE_ENV !== "production") {
-      if (origin.startsWith("http://localhost:")) {
+    if (isDevelopment) {
+      if (
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        isLanOrigin(origin)
+      ) {
         return callback(null, true);
       }
     }
 
-    // In production, check against allowed origins
     if (clientOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -91,8 +96,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
-app.use(express.json({ limit: "10kb" }));
+app.post('/api/webhook/razorpay', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
+app.use(express.json({ limit: "1mb" }));
 
 // DB CONNECT
 require("./config/db")();
@@ -111,6 +118,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/cart', require('./routes/cartRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/invoice', require('./routes/invoiceRoutes'));
 app.use('/api/payment', require('./routes/paymentRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/wishlist', require('./routes/wishlistRoutes'));

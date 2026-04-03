@@ -51,7 +51,7 @@ const Checkout = () => {
         }
 
         // Create Razorpay order
-        const orderData = await createPaymentOrder();
+        const orderData = await createPaymentOrder({ shippingAddress });
 
         const options = {
           key: orderData.key,
@@ -64,10 +64,10 @@ const Checkout = () => {
             try {
               // Verify payment on backend
               await verifyPayment({
+                appOrderId: orderData.appOrderId,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                orderData: { shippingAddress },
               });
 
               clearCart();
@@ -266,4 +266,3 @@ const Checkout = () => {
 };
 
 export default Checkout;
-

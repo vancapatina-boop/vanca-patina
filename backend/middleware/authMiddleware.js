@@ -15,8 +15,11 @@ const protect = asyncHandler(async (req, res, next) => {
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (e) {
-    const err = new Error("Not authorized, token failed");
+    const err = new Error(e.name === "TokenExpiredError" ? "Token expired" : "Not authorized, token failed");
     err.statusCode = 401;
+    if (e.name === "TokenExpiredError") {
+      err.code = "TOKEN_EXPIRED";
+    }
     throw err;
   }
 
@@ -32,11 +35,7 @@ const protect = asyncHandler(async (req, res, next) => {
     err.statusCode = 403;
     throw err;
   }
-
-  // Only enforce email verification when explicitly enabled via env var.
-  // Set REQUIRE_EMAIL_VERIFICATION=true in .env when you wire up a real
-  // email/OTP system. Until then, all users can log in freely.
-  if (process.env.REQUIRE_EMAIL_VERIFICATION === "true" && !user.isVerified) {
+  if (!user.isVerified) {
     const err = new Error("Account is not verified");
     err.statusCode = 403;
     throw err;

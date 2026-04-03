@@ -20,6 +20,11 @@ function generateOrderId() {
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, unique: true, sparse: true, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  customerSnapshot: {
+    name: { type: String },
+    email: { type: String },
+    phone: { type: String },
+  },
   orderItems: [orderItemSchema],
   shippingAddress: {
     address: { type: String },
@@ -27,7 +32,19 @@ const orderSchema = new mongoose.Schema({
     postalCode: { type: String },
     country: { type: String },
   },
-  paymentMethod: { type: String, default: 'PayPal' },
+  paymentMethod: { type: String, enum: ['PayPal', 'COD', 'Razorpay'], default: 'PayPal' },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending',
+  },
+  paymentGateway: {
+    provider: { type: String },
+    orderId: { type: String },
+    paymentId: { type: String },
+    signature: { type: String },
+    webhookEventId: { type: String },
+  },
   paymentResult: {
     id: String,
     status: String,
@@ -40,7 +57,23 @@ const orderSchema = new mongoose.Schema({
   totalPrice: { type: Number, required: true, default: 0.0 },
   isPaid: { type: Boolean, required: true, default: false },
   paidAt: { type: Date },
-  status: { type: String, enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'], default: 'pending' },
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+    default: 'pending',
+  },
+  invoice: {
+    invoiceNumber: { type: String, unique: true, sparse: true, index: true },
+    status: {
+      type: String,
+      enum: ['not_requested', 'ready', 'failed'],
+      default: 'not_requested',
+    },
+    invoiceUrl: { type: String },
+    invoicePublicId: { type: String },
+    generatedAt: { type: Date },
+    emailedAt: { type: Date },
+  },
 }, { timestamps: true });
 
 orderSchema.index({ user: 1 });

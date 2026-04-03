@@ -7,13 +7,14 @@ import {
   Edit, Trash2, Plus, Search, RefreshCw, Eye, X, Save, Loader2,
   Phone, Mail, UserX, ChevronRight, TrendingUp, IndianRupee,
   Package, CheckCircle2, Truck, Clock, AlertCircle, ShieldCheck,
-  ImagePlus, XCircle, BarChart3
+  ImagePlus, XCircle, BarChart3, Download, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import api from "@/services/api";
 import { logoutUser } from "@/services/authService";
+import { downloadAdminInvoice } from "@/services/ordersService";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ type AdminProduct = {
 
 type AdminOrder = {
   _id: string;
+  orderId?: string;
   user?: { name?: string; email?: string; _id?: string };
   orderItems: { name: string; qty: number; price: number; image?: string }[];
   totalPrice: number;
@@ -41,9 +43,12 @@ type AdminOrder = {
   shippingPrice?: number;
   status: string;
   isPaid: boolean;
+  paymentMethod?: string;
+  paymentStatus?: string;
   paidAt?: string;
   createdAt: string;
   shippingAddress?: { address?: string; city?: string; postalCode?: string; country?: string };
+  invoice?: { invoiceNumber?: string; invoiceUrl?: string };
 };
 
 type AdminUser = {
@@ -72,6 +77,7 @@ type Tab = "dashboard" | "products" | "orders" | "users";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: any; label: string }> = {
   pending:    { color: "text-amber-400",   bg: "bg-amber-400/10 border-amber-400/20",   icon: Clock,        label: "Pending" },
+  confirmed:  { color: "text-sky-400",     bg: "bg-sky-400/10 border-sky-400/20",       icon: ShieldCheck,  label: "Confirmed" },
   processing: { color: "text-blue-400",    bg: "bg-blue-400/10 border-blue-400/20",     icon: Package,      label: "Processing" },
   shipped:    { color: "text-purple-400",   bg: "bg-purple-400/10 border-purple-400/20", icon: Truck,        label: "Shipped" },
   delivered:  { color: "text-emerald-400",  bg: "bg-emerald-400/10 border-emerald-400/20", icon: CheckCircle2, label: "Delivered" },
@@ -90,7 +96,8 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const transitions: Record<string, string[]> = {
-  pending: ["processing", "cancelled"],
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["shipped", "cancelled"],
   processing: ["shipped", "cancelled"],
   shipped: ["delivered"],
   delivered: [],
@@ -124,6 +131,7 @@ const AdminDashboard = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderFilter, setOrderFilter] = useState("all");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
 
   // Users
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -295,6 +303,24 @@ const AdminDashboard = () => {
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Failed to update order");
     }
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    try {
+      setInvoiceLoadingId(orderId);
+      const blob = await downloadAdminInvoice(orderId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice_${orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Invoice is not available yet");
+    }
+    setInvoiceLoadingId(null);
   };
 
   // ── User handlers ─────────────────────────────────────────────────────
@@ -576,7 +602,7 @@ const AdminDashboard = () => {
     <div className="space-y-4">
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        {["all", "pending", "processing", "shipped", "delivered", "cancelled"].map(f => (
+        {["all", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"].map(f => (
           <button
             key={f}
             onClick={() => setOrderFilter(f)}
@@ -617,7 +643,7 @@ const AdminDashboard = () => {
               >
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-xs text-zinc-500">#{o._id.slice(-8).toUpperCase()}</p>
+                    <p className="text-xs text-zinc-500">#{(o.orderId || o._id).slice(-12).toUpperCase()}</p>
                     <p className="text-sm font-medium text-zinc-200">{o.user?.name || "Guest"}</p>
                     <p className="text-xs text-zinc-500">{o.user?.email || ""}</p>
                   </div>
@@ -668,11 +694,33 @@ const AdminDashboard = () => {
                         )}
                         <div>
                           <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Payment</p>
-                          <p className="text-sm text-zinc-300">{o.isPaid ? `Paid ${o.paidAt ? `on ${new Date(o.paidAt).toLocaleDateString()}` : ""}` : "Unpaid"}</p>
+                          <p className="text-sm text-zinc-300">
+                            {o.paymentMethod || "N/A"} | {o.paymentStatus || (o.isPaid ? "paid" : "pending")}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            {o.isPaid ? `Paid ${o.paidAt ? `on ${new Date(o.paidAt).toLocaleDateString()}` : ""}` : "Awaiting payment"}
+                          </p>
                           {o.shippingPrice !== undefined && (
                             <p className="text-xs text-zinc-500">Shipping: ₹{o.shippingPrice} | Tax: ₹{o.taxPrice}</p>
                           )}
                         </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <FileText className="w-4 h-4 text-[#D4AF37]" />
+                          <span>{o.invoice?.invoiceNumber || "Invoice is generated automatically once payment clears or COD is delivered"}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={invoiceLoadingId === o._id || (!o.invoice?.invoiceUrl && o.paymentStatus !== "paid" && o.status !== "delivered")}
+                          onClick={() => handleDownloadInvoice(o._id)}
+                          className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1" />
+                          {invoiceLoadingId === o._id ? "Preparing..." : "Download Invoice"}
+                        </Button>
                       </div>
 
                       {/* Status transition */}
