@@ -3,30 +3,51 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatCurrency } from "@/lib/formatCurrency";
 import {
   LayoutDashboard, Package, Heart, UserCircle, MapPin, LogOut,
   ShoppingCart, ChevronRight, Trash2, Edit2, Plus, Star, Eye,
-  CheckCircle2, Truck, Clock, X, Save, Loader2, ShoppingBag
+  CheckCircle2, Truck, Clock, X, Save, Loader2, ShoppingBag,
+  Download, FileText,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getProfile, updateProfile, getAddresses, addAddress, updateAddress, deleteAddress, getWishlist, removeFromWishlist } from "@/services/dashboardService";
-import { getMyOrders } from "@/services/ordersService";
+import { downloadInvoice, getMyOrders } from "@/services/ordersService";
 import { useCart } from "@/context/CartContext";
 import type { Product as CartProduct } from "@/types/product";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type OrderItem = { name: string; qty: number; price: number; image?: string; product?: string };
-type Order = { _id: string; orderId?: string; orderItems: OrderItem[]; totalPrice: number; status: string; isPaid: boolean; createdAt: string; shippingAddress?: any };
+type OrderShippingAddress = { address?: string; city?: string; postalCode?: string; country?: string };
+type Order = {
+  _id: string;
+  orderId?: string;
+  orderItems: OrderItem[];
+  totalPrice: number;
+  status: string;
+  isPaid: boolean;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  createdAt: string;
+  shippingAddress?: OrderShippingAddress;
+  invoice?: { invoiceNumber?: string; invoiceUrl?: string; status?: string };
+};
 type Product = { _id: string; name: string; price: number; image?: string; category?: string; ratings?: number };
 type Address = { _id: string; label: string; address: string; city: string; postalCode: string; country: string; isDefault: boolean };
 type ProfileData = { _id: string; name: string; email: string; phone: string; role: string; addresses: Address[] };
 
 type Section = "overview" | "orders" | "wishlist" | "profile" | "addresses";
 
-const sidebarItems: { id: Section; label: string; icon: any }[] = [
+interface UserDashboardProps {
+  initialSection?: Section;
+}
+
+const sidebarItems: { id: Section; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Dashboard", icon: LayoutDashboard },
   { id: "orders", label: "My Orders", icon: Package },
   { id: "wishlist", label: "Wishlist", icon: Heart },
@@ -36,8 +57,9 @@ const sidebarItems: { id: Section; label: string; icon: any }[] = [
 
 // ─── Status helpers ─────────────────────────────────────────────────────────
 
-const statusConfig: Record<string, { color: string; bg: string; icon: any }> = {
+const statusConfig: Record<string, { color: string; bg: string; icon: LucideIcon }> = {
   pending: { color: "text-amber-400", bg: "bg-amber-400/10 border-amber-400/20", icon: Clock },
+  confirmed: { color: "text-sky-400", bg: "bg-sky-400/10 border-sky-400/20", icon: CheckCircle2 },
   processing: { color: "text-blue-400", bg: "bg-blue-400/10 border-blue-400/20", icon: Package },
   shipped: { color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", icon: Truck },
   delivered: { color: "text-emerald-400", bg: "bg-emerald-400/10 border-emerald-400/20", icon: CheckCircle2 },
@@ -57,11 +79,11 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-const UserDashboard = () => {
+const UserDashboard = ({ initialSection = "overview" }: UserDashboardProps) => {
   const navigate = useNavigate();
   const { user, logout, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
-  const [section, setSection] = useState<Section>("overview");
+  const [section, setSection] = useState<Section>(initialSection);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Data states
@@ -70,6 +92,7 @@ const UserDashboard = () => {
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
 
   // Profile form
   const [profileForm, setProfileForm] = useState({ name: "", email: "", phone: "", password: "" });
@@ -108,6 +131,10 @@ const UserDashboard = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
   // ── Handlers ────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
@@ -115,11 +142,38 @@ const UserDashboard = () => {
     navigate("/");
   };
 
+  const handleInvoiceDownload = async (order: Order) => {
+    const id = order._id;
+    try {
+      setInvoiceLoadingId(id);
+      const blob = await downloadInvoice(id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const inv = order.invoice?.invoiceNumber?.replace(/[^\w-]+/g, "_") || order.orderId?.replace(/[^\w-]+/g, "_") || id.slice(-8);
+      link.download = `Invoice_${inv}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Invoice downloaded");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Could not download invoice. If this persists, contact support."));
+    } finally {
+      setInvoiceLoadingId(null);
+    }
+  };
+
+  const canDownloadInvoice = (order: Order) => {
+    if (order.status === "cancelled" && order.paymentStatus !== "paid" && !order.isPaid) return false;
+    return order.paymentStatus === "paid" || order.isPaid || order.status === "delivered";
+  };
+
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSaving(true);
     try {
-      const payload: any = {};
+      const payload: { name?: string; email?: string; phone?: string; password?: string } = {};
       if (profileForm.name) payload.name = profileForm.name;
       if (profileForm.email) payload.email = profileForm.email;
       if (profileForm.phone) payload.phone = profileForm.phone;
@@ -128,10 +182,11 @@ const UserDashboard = () => {
       setProfile(updated);
       setProfileForm(f => ({ ...f, password: "" }));
       toast.success("Profile updated successfully");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to update profile");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to update profile"));
+    } finally {
+      setProfileSaving(false);
     }
-    setProfileSaving(false);
   };
 
   const handleRemoveFromWishlist = async (productId: string) => {
@@ -178,8 +233,8 @@ const UserDashboard = () => {
       setEditingAddress(null);
       setAddressForm({ label: "Home", address: "", city: "", postalCode: "", country: "India", isDefault: false });
       toast.success(editingAddress ? "Address updated" : "Address added");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to save address");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to save address"));
     }
   };
 
@@ -216,7 +271,7 @@ const UserDashboard = () => {
     <div className="space-y-6">
       {/* Welcome */}
       <div className="bg-gradient-to-r from-[#D4AF37]/10 to-transparent border border-[#D4AF37]/20 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-zinc-100">Welcome back, {user?.name || "User"} 👋</h2>
+        <h2 className="text-2xl font-bold text-zinc-100">Welcome back, {user?.name || "User"}</h2>
         <p className="text-zinc-400 mt-1">Here's what's happening with your account.</p>
       </div>
 
@@ -225,7 +280,7 @@ const UserDashboard = () => {
         {[
           { label: "Total Orders", value: orders.length, icon: Package, color: "from-blue-500/20 to-blue-600/5 border-blue-500/20" },
           { label: "Wishlist Items", value: wishlist.length, icon: Heart, color: "from-pink-500/20 to-pink-600/5 border-pink-500/20" },
-          { label: "Total Spent", value: `₹${totalSpent.toLocaleString()}`, icon: ShoppingBag, color: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/20" },
+          { label: "Total Spent", value: formatCurrency(totalSpent), icon: ShoppingBag, color: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/20" },
           { label: "Saved Addresses", value: addresses.length, icon: MapPin, color: "from-purple-500/20 to-purple-600/5 border-purple-500/20" },
         ].map((card) => (
           <div key={card.label} className={`bg-gradient-to-br ${card.color} border rounded-xl p-4 sm:p-5`}>
@@ -266,7 +321,7 @@ const UserDashboard = () => {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <StatusBadge status={order.status} />
-                  <span className="text-sm font-semibold text-zinc-200">₹{order.totalPrice.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-zinc-200">{formatCurrency(order.totalPrice)}</span>
                 </div>
               </div>
             ))}
@@ -303,7 +358,7 @@ const UserDashboard = () => {
                   <p className="text-sm text-zinc-300">{new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                 </div>
                 <StatusBadge status={order.status} />
-                <p className="text-lg font-bold text-zinc-100">₹{order.totalPrice.toLocaleString()}</p>
+                <p className="text-lg font-bold text-zinc-100">{formatCurrency(order.totalPrice)}</p>
               </div>
               {/* Order items */}
               <div className="p-4 space-y-3">
@@ -318,11 +373,39 @@ const UserDashboard = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-zinc-200 truncate">{item.name}</p>
-                      <p className="text-xs text-zinc-500">Qty: {item.qty} × ₹{item.price.toLocaleString()}</p>
+                      <p className="text-xs text-zinc-500">Qty: {item.qty} x {formatCurrency(item.price)}</p>
                     </div>
-                    <p className="text-sm font-semibold text-zinc-300 shrink-0">₹{(item.qty * item.price).toLocaleString()}</p>
+                    <p className="text-sm font-semibold text-zinc-300 shrink-0">{formatCurrency(item.qty * item.price)}</p>
                   </div>
                 ))}
+              </div>
+              <div className="p-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 bg-white/[0.02]">
+                <div className="flex flex-col gap-0.5 text-xs text-zinc-500 min-w-0">
+                  <div className="flex items-center gap-2 text-zinc-400">
+                    <FileText className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                    <span>
+                      {order.invoice?.invoiceNumber
+                        ? `Invoice ${order.invoice.invoiceNumber}`
+                        : canDownloadInvoice(order)
+                          ? "Tax invoice — download PDF"
+                          : "Invoice available after payment is confirmed"}
+                    </span>
+                  </div>
+                  {order.invoice?.status === "failed" && (
+                    <p className="text-amber-400/90 pl-6">PDF had an error earlier — try download again.</p>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!canDownloadInvoice(order) || invoiceLoadingId === order._id}
+                  onClick={() => handleInvoiceDownload(order)}
+                  className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10 shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                  {invoiceLoadingId === order._id ? "Preparing…" : "Download invoice"}
+                </Button>
               </div>
             </div>
           ))}
@@ -364,7 +447,7 @@ const UserDashboard = () => {
                 <p className="text-sm font-medium text-zinc-200 truncate">{product.name}</p>
                 {product.category && <p className="text-xs text-zinc-500 mt-0.5">{product.category}</p>}
                 <div className="flex items-center justify-between mt-3">
-                  <p className="text-lg font-bold text-[#D4AF37]">₹{product.price.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-[#D4AF37]">{formatCurrency(product.price)}</p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="h-8 text-xs border-white/10 hover:bg-white/10" onClick={() => navigate(`/product/${product._id}`)}>
                       <Eye className="w-3 h-3 mr-1" /> View

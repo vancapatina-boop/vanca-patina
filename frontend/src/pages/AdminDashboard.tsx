@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatCurrency } from "@/lib/formatCurrency";
 import {
   LayoutDashboard, PackageOpen, ShoppingCart, Users, LogOut,
   Edit, Trash2, Plus, Search, RefreshCw, Eye, X, Save, Loader2,
@@ -9,6 +11,7 @@ import {
   Package, CheckCircle2, Truck, Clock, AlertCircle, ShieldCheck,
   ImagePlus, XCircle, BarChart3, Download, FileText
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +50,19 @@ type AdminOrder = {
   paymentStatus?: string;
   paidAt?: string;
   createdAt: string;
-  shippingAddress?: { address?: string; city?: string; postalCode?: string; country?: string };
-  invoice?: { invoiceNumber?: string; invoiceUrl?: string };
+  shippingAddress?: {
+    fullName?: string;
+    phoneNumber?: string;
+    email?: string;
+    address?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  };
+  invoice?: { invoiceNumber?: string; invoiceUrl?: string; status?: string };
 };
 
 type AdminUser = {
@@ -60,7 +74,7 @@ type AdminUser = {
   isVerified: boolean;
   isBlocked: boolean;
   createdAt: string;
-  addresses?: any[];
+  addresses?: AdminAddress[];
 };
 
 type DashStats = {
@@ -72,10 +86,19 @@ type DashStats = {
 };
 
 type Tab = "dashboard" | "products" | "orders" | "users";
+type AdminAddress = {
+  _id?: string;
+  label?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
+  isDefault?: boolean;
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const statusConfig: Record<string, { color: string; bg: string; icon: any; label: string }> = {
+const statusConfig: Record<string, { color: string; bg: string; icon: LucideIcon; label: string }> = {
   pending:    { color: "text-amber-400",   bg: "bg-amber-400/10 border-amber-400/20",   icon: Clock,        label: "Pending" },
   confirmed:  { color: "text-sky-400",     bg: "bg-sky-400/10 border-sky-400/20",       icon: ShieldCheck,  label: "Confirmed" },
   processing: { color: "text-blue-400",    bg: "bg-blue-400/10 border-blue-400/20",     icon: Package,      label: "Processing" },
@@ -95,16 +118,34 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
+/** Must match backend `updateOrderStatus` transitions (fulfillment pipeline). */
 const transitions: Record<string, string[]> = {
-  pending: ["confirmed", "cancelled"],
-  confirmed: ["shipped", "cancelled"],
-  processing: ["shipped", "cancelled"],
+  pending: ["confirmed", "processing", "cancelled"],
+  confirmed: ["processing", "shipped", "delivered", "cancelled"],
+  processing: ["shipped", "delivered", "cancelled"],
   shipped: ["delivered"],
   delivered: [],
   cancelled: [],
 };
 
-const sidebarItems: { id: Tab; label: string; icon: any }[] = [
+const transitionActionLabel: Record<string, string> = {
+  confirmed: "Confirm payment received",
+  processing: "Start processing",
+  shipped: "Mark as shipped",
+  delivered: "Mark as delivered",
+  cancelled: "Cancel order",
+};
+
+function orderIsPaid(o: AdminOrder) {
+  return o.paymentStatus === "paid" || o.isPaid === true;
+}
+
+function canDownloadInvoice(o: AdminOrder) {
+  if (o.status === "cancelled" && !orderIsPaid(o)) return false;
+  return orderIsPaid(o) || o.status === "delivered";
+}
+
+const sidebarItems: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "products", label: "Products", icon: PackageOpen },
   { id: "orders", label: "Orders", icon: ShoppingCart },
@@ -132,6 +173,7 @@ const AdminDashboard = () => {
   const [orderFilter, setOrderFilter] = useState("all");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
 
   // Users
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -144,9 +186,10 @@ const AdminDashboard = () => {
   }), []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [productForm, setProductForm] = useState(emptyForm);
-  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  // Multi-image support
+  const [productImageFiles, setProductImageFiles] = useState<File[]>([]);
+  const [productImagePreviews, setProductImagePreviews] = useState<string[]>([]);
   const [productImageUrl, setProductImageUrl] = useState("");
-  const [productImagePreview, setProductImagePreview] = useState("");
   const [showProductForm, setShowProductForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -164,10 +207,11 @@ const AdminDashboard = () => {
     try {
       const res = await api.get("/api/admin/stats");
       setStats(res.data);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to load stats");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to load stats"));
+    } finally {
+      setStatsLoading(false);
     }
-    setStatsLoading(false);
   }, []);
 
   const fetchProducts = useCallback(async () => {
@@ -175,10 +219,11 @@ const AdminDashboard = () => {
     try {
       const res = await api.get("/api/admin/products", { params: { page: 1, limit: 200 } });
       setProducts(Array.isArray(res.data?.products) ? res.data.products : []);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to load products");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to load products"));
+    } finally {
+      setProductsLoading(false);
     }
-    setProductsLoading(false);
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -186,10 +231,11 @@ const AdminDashboard = () => {
     try {
       const res = await api.get("/api/admin/orders");
       setOrders(Array.isArray(res.data) ? res.data : []);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to load orders");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to load orders"));
+    } finally {
+      setOrdersLoading(false);
     }
-    setOrdersLoading(false);
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -197,10 +243,11 @@ const AdminDashboard = () => {
     try {
       const res = await api.get("/api/admin/users");
       setUsers(Array.isArray(res.data) ? res.data : []);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to load users");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to load users"));
+    } finally {
+      setUsersLoading(false);
     }
-    setUsersLoading(false);
   }, []);
 
   useEffect(() => {
@@ -215,9 +262,9 @@ const AdminDashboard = () => {
   const resetProductForm = () => {
     setEditingId(null);
     setProductForm(emptyForm);
-    setProductImageFile(null);
+    setProductImageFiles([]);
+    setProductImagePreviews([]);
     setProductImageUrl("");
-    setProductImagePreview("");
     setShowProductForm(false);
   };
 
@@ -227,25 +274,42 @@ const AdminDashboard = () => {
       name: p.name, price: String(p.price), category: p.category,
       description: p.description, stock: String(p.stock), finishType: p.finishType || "Standard",
     });
-    setProductImageUrl(p.image || "");
-    setProductImagePreview(p.image || "");
-    setProductImageFile(null);
+    // Pre-populate existing images from DB
+    const existingImgs = [p.image, ...(p.images || [])].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
+    setProductImageUrl(existingImgs[0] || "");
+    setProductImagePreviews(existingImgs);
+    setProductImageFiles([]);
     setShowProductForm(true);
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProductImageFile(file);
-      setProductImagePreview(URL.createObjectURL(file));
-    }
+  const handleImageFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const newPreviews = files.map(f => URL.createObjectURL(f));
+    setProductImageFiles(prev => [...prev, ...files]);
+    setProductImagePreviews(prev => [...prev, ...newPreviews]);
+    // reset input so same file can be re-added if needed
+    e.target.value = "";
+  };
+
+  const removeImagePreview = (index: number) => {
+    setProductImageFiles(prev => prev.filter((_, i) => i !== index));
+    setProductImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload: any = {
+      const payload: {
+        name: string;
+        price: number;
+        category: string;
+        description: string;
+        stock: number;
+        finishType: string;
+        image?: string;
+      } = {
         name: productForm.name,
         price: Number(productForm.price),
         category: productForm.category,
@@ -253,7 +317,10 @@ const AdminDashboard = () => {
         stock: Number(productForm.stock),
         finishType: productForm.finishType,
       };
-      if (productImageUrl && !productImageFile) payload.image = productImageUrl;
+      // Use URL field if no file is selected and no existing previews
+      if (productImageUrl && productImageFiles.length === 0 && productImagePreviews.length === 0) {
+        payload.image = productImageUrl;
+      }
 
       let savedProduct: AdminProduct;
       if (editingId) {
@@ -264,22 +331,24 @@ const AdminDashboard = () => {
         savedProduct = res.data;
       }
 
-      // Upload image file if selected
-      if (productImageFile) {
-        const fd = new FormData();
-        fd.append("productId", savedProduct._id || editingId!);
-        fd.append("image", productImageFile);
-        await api.post("/api/admin/products/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      // Upload all selected image files one by one
+      if (productImageFiles.length > 0) {
+        for (const file of productImageFiles) {
+          const fd = new FormData();
+          fd.append("productId", savedProduct._id || editingId!);
+          fd.append("image", file);
+          await api.post("/api/admin/products/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        }
       }
 
       toast.success(editingId ? "Product updated!" : "Product created!");
       resetProductForm();
       await fetchProducts();
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.response?.data?.issues?.[0]?.message || "Failed to save product";
-      toast.error(msg);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to save product"));
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -288,39 +357,49 @@ const AdminDashboard = () => {
       await api.delete(`/api/admin/products/${id}`);
       toast.success("Product deleted");
       await fetchProducts();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to delete");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to delete"));
     }
   };
 
   // ── Order handlers ────────────────────────────────────────────────────
 
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    if (status === "cancelled" && !confirm("Cancel this order? Stock will be restored for items that were not already shipped or delivered.")) {
+      return;
+    }
     try {
+      setStatusUpdatingId(orderId);
       await api.put(`/api/admin/orders/${orderId}`, { status });
-      toast.success(`Order ${status}`);
+      toast.success(`Order updated: ${statusConfig[status]?.label || status}`);
       await fetchOrders();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to update order");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to update order"));
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
-  const handleDownloadInvoice = async (orderId: string) => {
+  const handleDownloadInvoice = async (order: AdminOrder) => {
+    const orderId = order._id;
     try {
       setInvoiceLoadingId(orderId);
       const blob = await downloadAdminInvoice(orderId);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `invoice_${orderId}.pdf`;
+      const invNo = order.invoice?.invoiceNumber?.replace(/[^\w-]+/g, "_") || order.orderId?.replace(/[^\w-]+/g, "_") || orderId.slice(-8);
+      link.download = `Invoice_${invNo}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Invoice is not available yet");
+      toast.success("Invoice downloaded");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Invoice is not available yet"));
+    } finally {
+      setInvoiceLoadingId(null);
     }
-    setInvoiceLoadingId(null);
   };
 
   // ── User handlers ─────────────────────────────────────────────────────
@@ -331,8 +410,8 @@ const AdminDashboard = () => {
       await api.delete(`/api/admin/users/${userId}`);
       toast.success("User deleted");
       await fetchUsers();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to delete user");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to delete user"));
     }
   };
 
@@ -375,7 +454,7 @@ const AdminDashboard = () => {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Total Revenue", value: `₹${stats.totalRevenue.toLocaleString()}`, icon: IndianRupee, gradient: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/20", iconColor: "text-emerald-400" },
+              { label: "Total Revenue", value: formatCurrency(stats.totalRevenue), icon: IndianRupee, gradient: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/20", iconColor: "text-emerald-400" },
               { label: "Total Orders", value: stats.totalOrders, icon: ShoppingCart, gradient: "from-blue-500/20 to-blue-600/5 border-blue-500/20", iconColor: "text-blue-400" },
               { label: "Total Products", value: stats.totalProducts, icon: PackageOpen, gradient: "from-purple-500/20 to-purple-600/5 border-purple-500/20", iconColor: "text-purple-400" },
               { label: "Registered Users", value: stats.totalUsers, icon: Users, gradient: "from-amber-500/20 to-amber-600/5 border-amber-500/20", iconColor: "text-amber-400" },
@@ -408,12 +487,12 @@ const AdminDashboard = () => {
                 {stats.latestOrders.map((o) => (
                   <div key={o._id} className="flex items-center justify-between gap-4 p-3 bg-white/[0.02] rounded-lg border border-white/5">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-200 truncate">{o.user?.name || "Guest"} — {o.orderItems.map(i => i.name).join(", ")}</p>
+                      <p className="text-sm font-medium text-zinc-200 truncate">{o.user?.name || "Guest"} - {o.orderItems.map(i => i.name).join(", ")}</p>
                       <p className="text-xs text-zinc-500">{new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <StatusBadge status={o.status} />
-                      <span className="text-sm font-bold text-zinc-200">₹{o.totalPrice.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-zinc-200">{formatCurrency(o.totalPrice)}</span>
                     </div>
                   </div>
                 ))}
@@ -480,10 +559,10 @@ const AdminDashboard = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-zinc-200 truncate">{p.name}</p>
-                    <p className="text-xs text-zinc-500">{p.finishType || "Standard"} • {p.ratings || 0}★</p>
+                    <p className="text-xs text-zinc-500">{p.finishType || "Standard"} | Rating {p.ratings || 0}</p>
                   </div>
                   <span className="text-xs text-zinc-400 truncate">{p.category}</span>
-                  <span className="text-sm font-semibold text-zinc-200 text-right">₹{p.price.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-zinc-200 text-right">{formatCurrency(p.price)}</span>
                   <div className="text-center">
                     <Badge className={`text-[10px] ${p.stock > 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
                       {p.stock > 0 ? `${p.stock} in stock` : "Out of stock"}
@@ -522,13 +601,27 @@ const AdminDashboard = () => {
               </div>
 
               <form onSubmit={handleSaveProduct} className="space-y-3">
-                {/* Image preview */}
-                {productImagePreview && (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-white/5 border border-white/10">
-                    <img src={productImagePreview} alt="Preview" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => { setProductImagePreview(""); setProductImageFile(null); setProductImageUrl(""); }} className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-red-500/60">
-                      <X className="w-3 h-3" />
-                    </button>
+                {/* Multi-image previews */}
+                {productImagePreviews.length > 0 && (
+                  <div>
+                    <p className="text-xs text-zinc-500 mb-1.5">{productImagePreviews.length} image{productImagePreviews.length > 1 ? "s" : ""} selected</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {productImagePreviews.map((src, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-white/5 border border-white/10 group">
+                          <img src={src} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeImagePreview(idx)}
+                            className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 hover:bg-red-500/80 transition-all"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {idx === 0 && (
+                            <span className="absolute bottom-1 left-1 text-[9px] bg-[#D4AF37]/80 text-black font-bold px-1 rounded">MAIN</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -542,7 +635,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Price (₹) *</label>
+                    <label className="text-xs text-zinc-400 mb-1 block">Price (INR) *</label>
                     <Input type="number" min="0" value={productForm.price} onChange={e => setProductForm(f => ({ ...f, price: e.target.value }))} required className="bg-white/5 border-white/10 text-white text-sm" />
                   </div>
                   <div>
@@ -570,15 +663,21 @@ const AdminDashboard = () => {
                   <textarea value={productForm.description} onChange={e => setProductForm(f => ({ ...f, description: e.target.value }))} rows={3} required className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none" />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Image URL</label>
-                  <Input value={productImageUrl} onChange={e => { setProductImageUrl(e.target.value); setProductImagePreview(e.target.value); }} placeholder="/uploads/img.jpg or https://..." className="bg-white/5 border-white/10 text-white text-sm" />
+                  <label className="text-xs text-zinc-400 mb-1 block">Image URL (optional)</label>
+                  <Input value={productImageUrl} onChange={e => setProductImageUrl(e.target.value)} placeholder="https://... or /uploads/img.jpg" className="bg-white/5 border-white/10 text-white text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Or Upload Image</label>
-                  <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-white/20 hover:border-[#D4AF37]/40 cursor-pointer transition-colors bg-white/[0.02]">
-                    <ImagePlus className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm text-zinc-400">{productImageFile ? productImageFile.name : "Choose file..."}</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+                  <label className="text-xs text-zinc-400 mb-1.5 flex items-center gap-1.5 block">
+                    <ImagePlus className="w-3.5 h-3.5" /> Upload Photos
+                    <span className="text-zinc-600">(select multiple)</span>
+                  </label>
+                  <label className="flex flex-col items-center gap-2 px-3 py-4 rounded-lg border-2 border-dashed border-white/20 hover:border-[#D4AF37]/50 cursor-pointer transition-all bg-white/[0.02] hover:bg-white/[0.04]">
+                    <ImagePlus className="w-6 h-6 text-zinc-500" />
+                    <span className="text-xs text-zinc-500 text-center">
+                      Click to add photos<br />
+                      <span className="text-zinc-600">You can add multiple files - each click adds more</span>
+                    </span>
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageFilesChange} />
                   </label>
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -650,7 +749,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-lg font-bold text-zinc-100">₹{o.totalPrice.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-zinc-100">{formatCurrency(o.totalPrice)}</p>
                     <p className="text-xs text-zinc-500">{new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
                   <StatusBadge status={o.status} />
@@ -677,8 +776,8 @@ const AdminDashboard = () => {
                               {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-4 h-4 text-zinc-600 m-auto mt-3" />}
                             </div>
                             <span className="text-sm text-zinc-300 flex-1">{item.name}</span>
-                            <span className="text-xs text-zinc-500">×{item.qty}</span>
-                            <span className="text-sm font-medium text-zinc-200">₹{(item.price * item.qty).toLocaleString()}</span>
+                            <span className="text-xs text-zinc-500">Qty: {item.qty}</span>
+                            <span className="text-sm font-medium text-zinc-200">{formatCurrency(item.price * item.qty)}</span>
                           </div>
                         ))}
                       </div>
@@ -687,9 +786,28 @@ const AdminDashboard = () => {
                       <div className="grid grid-cols-2 gap-4">
                         {o.shippingAddress && (
                           <div>
-                            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Shipping</p>
-                            <p className="text-sm text-zinc-300">{o.shippingAddress.address}</p>
-                            <p className="text-sm text-zinc-400">{o.shippingAddress.city}, {o.shippingAddress.postalCode}</p>
+                            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Ship to</p>
+                            {o.shippingAddress.fullName && (
+                              <p className="text-sm font-medium text-zinc-200">{o.shippingAddress.fullName}</p>
+                            )}
+                            <p className="text-sm text-zinc-300">
+                              {o.shippingAddress.address1 || o.shippingAddress.address || "—"}
+                              {o.shippingAddress.address2 ? `, ${o.shippingAddress.address2}` : ""}
+                            </p>
+                            <p className="text-sm text-zinc-400">
+                              {[o.shippingAddress.city, o.shippingAddress.state].filter(Boolean).join(", ")}
+                              {o.shippingAddress.postalCode ? ` ${o.shippingAddress.postalCode}` : ""}
+                            </p>
+                            {o.shippingAddress.country && (
+                              <p className="text-xs text-zinc-500">{o.shippingAddress.country}</p>
+                            )}
+                            {(o.shippingAddress.phoneNumber || o.shippingAddress.email) && (
+                              <p className="text-xs text-zinc-500 mt-1">
+                                {o.shippingAddress.phoneNumber && <span>{o.shippingAddress.phoneNumber}</span>}
+                                {o.shippingAddress.phoneNumber && o.shippingAddress.email && <span> · </span>}
+                                {o.shippingAddress.email && <span>{o.shippingAddress.email}</span>}
+                              </p>
+                            )}
                           </div>
                         )}
                         <div>
@@ -701,42 +819,64 @@ const AdminDashboard = () => {
                             {o.isPaid ? `Paid ${o.paidAt ? `on ${new Date(o.paidAt).toLocaleDateString()}` : ""}` : "Awaiting payment"}
                           </p>
                           {o.shippingPrice !== undefined && (
-                            <p className="text-xs text-zinc-500">Shipping: ₹{o.shippingPrice} | Tax: ₹{o.taxPrice}</p>
+                            <p className="text-xs text-zinc-500">Shipping: {formatCurrency(o.shippingPrice ?? 0)} | Tax: {formatCurrency(o.taxPrice ?? 0)}</p>
                           )}
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                        <div className="flex items-center gap-2 text-sm text-zinc-400">
-                          <FileText className="w-4 h-4 text-[#D4AF37]" />
-                          <span>{o.invoice?.invoiceNumber || "Invoice is generated automatically once payment clears or COD is delivered"}</span>
+                        <div className="flex flex-col gap-0.5 text-sm text-zinc-400 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                            <span className="font-medium text-zinc-300">
+                              {o.invoice?.invoiceNumber
+                                ? `Invoice ${o.invoice.invoiceNumber}`
+                                : orderIsPaid(o)
+                                  ? "Tax invoice — PDF will generate on download if missing"
+                                  : "Invoice available after payment is confirmed"}
+                            </span>
+                          </div>
+                          {o.invoice?.status === "failed" && (
+                            <p className="text-xs text-amber-400/90 pl-6">PDF generation had an error; try download again or check server logs.</p>
+                          )}
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={invoiceLoadingId === o._id || (!o.invoice?.invoiceUrl && o.paymentStatus !== "paid" && o.status !== "delivered")}
-                          onClick={() => handleDownloadInvoice(o._id)}
-                          className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                          disabled={
+                            invoiceLoadingId === o._id ||
+                            !canDownloadInvoice(o)
+                          }
+                          onClick={() => handleDownloadInvoice(o)}
+                          className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10 shrink-0"
                         >
                           <Download className="w-3.5 h-3.5 mr-1" />
-                          {invoiceLoadingId === o._id ? "Preparing..." : "Download Invoice"}
+                          {invoiceLoadingId === o._id ? "Preparing…" : "Download invoice (PDF)"}
                         </Button>
                       </div>
 
                       {/* Status transition */}
                       {transitions[o.status]?.length > 0 && (
                         <div>
-                          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Update Status</p>
-                          <div className="flex gap-2">
-                            {transitions[o.status].map(s => (
+                          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Fulfillment — update status</p>
+                          <p className="text-[11px] text-zinc-600 mb-2">
+                            Typical flow: confirmed → processing → shipped → delivered (or skip steps if your process allows).
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {transitions[o.status].map((s) => (
                               <Button
                                 key={s}
                                 size="sm"
+                                disabled={statusUpdatingId === o._id}
                                 onClick={() => handleUpdateOrderStatus(o._id, s)}
-                                className={`text-xs ${s === "cancelled" ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/20" : "bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 border border-[#D4AF37]/20"}`}
+                                className={`text-xs ${
+                                  s === "cancelled"
+                                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/20"
+                                    : "bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 border border-[#D4AF37]/20"
+                                }`}
                               >
                                 {s === "cancelled" ? <XCircle className="w-3 h-3 mr-1" /> : <ChevronRight className="w-3 h-3 mr-1" />}
-                                Mark as {s.charAt(0).toUpperCase() + s.slice(1)}
+                                {transitionActionLabel[s] || `Mark as ${s}`}
                               </Button>
                             ))}
                           </div>
@@ -849,7 +989,7 @@ const AdminDashboard = () => {
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-white/5 bg-white/[0.02]">
         <div className="p-6 border-b border-white/5">
           <Link to="/" className="inline-block">
-            <h1 className="text-xl font-bold tracking-wider text-[#D4AF37] font-['Playfair_Display']">VANCA INTERIO</h1>
+            <h1 className="text-xl font-bold tracking-wider text-[#D4AF37] font-['Playfair_Display']">VANCA PATINA</h1>
             <p className="text-[10px] tracking-[0.3em] text-zinc-500 mt-1 text-center">ADMIN PORTAL</p>
           </Link>
         </div>

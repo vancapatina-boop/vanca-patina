@@ -28,33 +28,30 @@ const Shop = () => {
 
   // Update URL when category changes
   useEffect(() => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+
     if (selectedCategory === "All") {
-      searchParams.delete("category");
+      nextSearchParams.delete("category");
     } else {
-      searchParams.set("category", selectedCategory);
+      nextSearchParams.set("category", selectedCategory);
     }
-    setSearchParams(searchParams);
+
+    setSearchParams(nextSearchParams, { replace: true });
   }, [selectedCategory, searchParams, setSearchParams]);
 
-  // Log for debugging
-  console.log("🛍️ Shop component - products count:", products.length);
-  console.log("🛍️ Shop component - loading:", loading);
-  console.log("🛍️ Shop component - error:", error);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
-    console.log("📂 Unique categories:", cats);
     return cats;
   }, [products]);
 
   const finishTypes = useMemo(() => {
     const types = [...new Set(products.map((p) => p.finishType))].filter(Boolean);
-    console.log("🎨 Finish types:", types);
     return types;
   }, [products]);
 
   const filtered = useMemo(() => {
-    let result = products.filter((p) => {
+    const result = products.filter((p) => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.description.toLowerCase().includes(search.toLowerCase());
       const matchCategory = selectedCategory === "All" || p.category === selectedCategory;
@@ -66,10 +63,13 @@ const Shop = () => {
       case "price-asc": result.sort((a, b) => a.price - b.price); break;
       case "price-desc": result.sort((a, b) => b.price - a.price); break;
       case "rating": result.sort((a, b) => b.rating - a.rating); break;
-      default: result.sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime());
+      default:
+        result.sort(
+          (a, b) =>
+            new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+        );
     }
     
-    console.log("🔍 Filtered products:", result.length);
     return result;
   }, [products, search, selectedCategory, selectedFinish, sortBy]);
 

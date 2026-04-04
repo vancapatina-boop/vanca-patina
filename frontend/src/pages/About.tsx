@@ -12,7 +12,7 @@ const fadeUp = {
 const About = () => (
   <div className="min-h-screen pt-24 pb-16">
     <div className="container mx-auto px-4 lg:px-8">
-      <SectionHeading subtitle="Our Story" title="About Vanca Interio Patina" />
+      <SectionHeading subtitle="Our Story" title="About Vanca Patina" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto mb-24">
         <motion.div {...fadeUp}>
@@ -23,7 +23,7 @@ const About = () => (
         <motion.div {...fadeUp} transition={{ duration: 0.6, delay: 0.1 }}>
           <h3 className="text-2xl font-display font-bold text-foreground mb-4">Where Chemistry Meets Artistry</h3>
           <p className="text-muted-foreground leading-relaxed mb-4">
-            Founded with a passion for transforming ordinary metals into extraordinary works of art, Vanca Interio Patina has become India's leading brand for decorative chemical solutions.
+            Founded with a passion for transforming ordinary metals into extraordinary works of art, Vanca Patina has become India's leading brand for decorative chemical solutions.
           </p>
           <p className="text-muted-foreground leading-relaxed mb-4">
             Our premium patina chemicals, finishing kits, and protective coatings are trusted by interior designers, architects, artists, and metal workers across the country.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/services/api";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 type Profile = {
   _id: string;
@@ -35,9 +36,9 @@ const Profile = () => {
           password: "",
         });
       })
-      .catch((e: any) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-        setErrorMsg(e?.response?.data?.message ?? e?.message ?? "Failed to load profile");
+        setErrorMsg(getApiErrorMessage(error, "Failed to load profile"));
       })
       .finally(() => {
         if (cancelled) return;
@@ -55,10 +56,9 @@ const Profile = () => {
     try {
       const res = await api.put("/api/users/profile", form);
       setProfile(res.data);
-      // Keep password field empty after save.
       setForm((f) => ({ ...f, password: "" }));
-    } catch (e: any) {
-      setErrorMsg(e?.response?.data?.message ?? e?.message ?? "Failed to update profile");
+    } catch (error: unknown) {
+      setErrorMsg(getApiErrorMessage(error, "Failed to update profile"));
     }
   };
 
@@ -121,4 +121,3 @@ const Profile = () => {
 };
 
 export default Profile;
-

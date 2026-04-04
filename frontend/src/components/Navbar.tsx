@@ -42,10 +42,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           <Link to="/" className="flex items-center gap-2">
             <span className="text-2xl font-display font-bold text-gradient-copper">
-              VANCA
-            </span>
-            <span className="text-xs tracking-[0.3em] text-muted-foreground uppercase">
-              Interio Patina
+              VANCA PATINA
             </span>
           </Link>
 
@@ -89,7 +86,7 @@ const Navbar = () => {
                     <LayoutDashboard className="w-4 h-4" />
                     <span className="font-medium">Dashboard</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/dashboard")} className="cursor-pointer gap-2 py-2.5">
+                  <DropdownMenuItem onClick={() => navigate("/my-orders")} className="cursor-pointer gap-2 py-2.5">
                     <Package className="w-4 h-4" />
                     <span className="font-medium">My Orders</span>
                   </DropdownMenuItem>

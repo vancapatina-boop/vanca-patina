@@ -58,11 +58,11 @@ const PolicyPage = ({
             <div className="mt-6 space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-primary" />
-                <span>ankit3848mishra@gmail.com</span>
+                <span>vancapatina@gmail.com</span>
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="h-4 w-4 text-primary" />
-                <span>+91 8882480459</span>
+                <span>+91 8882359695</span>
               </div>
             </div>
 

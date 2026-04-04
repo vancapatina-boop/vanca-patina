@@ -42,7 +42,7 @@ const PrivacyPolicy = () => (
   <PolicyPage
     eyebrow="Privacy"
     title="Privacy Policy"
-    description="How Vanca Interio Patina collects, uses, and safeguards customer information across orders, support, and site usage."
+    description="How Vanca Patina collects, uses, and safeguards customer information across orders, support, and site usage."
     lastUpdated="April 1, 2026"
     sections={sections}
   />

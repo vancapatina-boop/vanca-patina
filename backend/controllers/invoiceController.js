@@ -1,6 +1,6 @@
 const Order = require('../models/Order');
 const asyncHandler = require('../utils/asyncHandler');
-const { ensureInvoiceForOrder, getInvoiceAccessUrl } = require('../services/invoiceService');
+const { ensureInvoiceForOrder, getInvoiceAccessUrl, streamInvoicePdfToResponse } = require('../services/invoiceService');
 
 function serializeInvoice(order) {
   return {
@@ -43,25 +43,30 @@ const getInvoiceForAdmin = asyncHandler(async (req, res) => {
 async function pipeInvoicePdf(order, res) {
   const invoiceUrl = getInvoiceAccessUrl(order);
 
-  if (!invoiceUrl) {
-    const err = new Error('Invoice URL not found');
-    err.statusCode = 404;
-    throw err;
+  if (invoiceUrl) {
+    try {
+      const fetchOpts = {};
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        fetchOpts.signal = AbortSignal.timeout(30_000);
+      }
+      const response = await fetch(invoiceUrl, fetchOpts);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const buf = Buffer.from(arrayBuffer);
+        const fileName = `invoice_${order.invoice?.invoiceNumber || order.orderId || order._id}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', buf.length);
+        res.end(buf);
+        return;
+      }
+      console.warn('[Invoice] Hosted PDF returned', response.status, '— streaming fresh PDF');
+    } catch (err) {
+      console.warn('[Invoice] Hosted PDF fetch failed — streaming fresh PDF:', err.message);
+    }
   }
 
-  const response = await fetch(invoiceUrl);
-  if (!response.ok) {
-    const err = new Error(`Unable to download invoice PDF (${response.status})`);
-    err.statusCode = response.status;
-    throw err;
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  const fileName = `invoice_${order.invoice?.invoiceNumber || order.orderId || order._id}.pdf`;
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-  res.send(Buffer.from(arrayBuffer));
+  await streamInvoicePdfToResponse(order, res);
 }
 
 const downloadInvoiceForUser = asyncHandler(async (req, res) => {

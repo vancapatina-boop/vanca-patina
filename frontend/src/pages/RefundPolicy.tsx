@@ -41,7 +41,7 @@ const RefundPolicy = () => (
   <PolicyPage
     eyebrow="Orders"
     title="Refund Policy"
-    description="The situations in which refunds, replacements, or credits may be issued for products ordered from Vanca Interio Patina."
+    description="The situations in which refunds, replacements, or credits may be issued for products ordered from Vanca Patina."
     lastUpdated="April 1, 2026"
     sections={sections}
   />

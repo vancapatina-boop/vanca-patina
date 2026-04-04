@@ -26,7 +26,7 @@ const sections = [
     title: "Pricing, Intellectual Property, And Content",
     content: [
       "All prices, offers, and product availability are subject to change without notice. Taxes, delivery charges, or location-based fees may be added at checkout where applicable.",
-      "All text, graphics, product content, imagery, branding, and website presentation remain the property of Vanca Interio Patina unless otherwise stated and may not be copied or reused without permission.",
+      "All text, graphics, product content, imagery, branding, and website presentation remain the property of Vanca Patina unless otherwise stated and may not be copied or reused without permission.",
     ],
   },
   {
@@ -42,7 +42,7 @@ const TermsAndConditions = () => (
   <PolicyPage
     eyebrow="Legal"
     title="Terms & Conditions"
-    description="The rules, responsibilities, and order terms that apply when customers browse, purchase, and use products from Vanca Interio Patina."
+    description="The rules, responsibilities, and order terms that apply when customers browse, purchase, and use products from Vanca Patina."
     lastUpdated="April 1, 2026"
     sections={sections}
   />

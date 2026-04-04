@@ -42,7 +42,7 @@ const ShippingPolicy = () => (
   <PolicyPage
     eyebrow="Delivery"
     title="Shipping Policy"
-    description="How Vanca Interio Patina processes, dispatches, and supports deliveries for chemical finishes, patina products, and related orders."
+    description="How Vanca Patina processes, dispatches, and supports deliveries for chemical finishes, patina products, and related orders."
     lastUpdated="April 1, 2026"
     sections={sections}
   />

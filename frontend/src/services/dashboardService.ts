@@ -19,12 +19,28 @@ export async function getAddresses() {
   return res.data;
 }
 
-export async function addAddress(data: { label?: string; address: string; city: string; postalCode: string; country: string; isDefault?: boolean }) {
+export type SavedAddressPayload = {
+  label?: string;
+  address: string;
+  address1?: string;
+  address2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+  fullName?: string;
+  phoneNumber?: string;
+  email?: string;
+  addressType?: "home" | "work" | "other";
+  isDefault?: boolean;
+};
+
+export async function addAddress(data: SavedAddressPayload) {
   const res = await api.post("/api/users/addresses", data);
   return res.data;
 }
 
-export async function updateAddress(addressId: string, data: { label?: string; address?: string; city?: string; postalCode?: string; country?: string; isDefault?: boolean }) {
+export async function updateAddress(addressId: string, data: Partial<SavedAddressPayload>) {
   const res = await api.put(`/api/users/addresses/${addressId}`, data);
   return res.data;
 }

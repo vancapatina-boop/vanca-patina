@@ -30,6 +30,15 @@ const loginLimiter = rateLimit({
   message: 'Too many login attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});
+
+const authActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many requests for this authentication action, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Rate limit for registration (10 attempts per hour)
@@ -46,9 +55,9 @@ router.post('/login', loginLimiter, validate(loginSchema), authUser);
 router.post('/admin-login', loginLimiter, validate(loginSchema), adminLogin);
 router.get('/me', protect, getCurrentUser);
 router.get('/verify-email/:token', verifyEmail);
-router.post('/resend-verification', loginLimiter, validate(resendVerificationSchema), resendVerificationEmail);
-router.post('/forgot-password', loginLimiter, validate(forgotPasswordSchema), forgotPassword);
-router.post('/reset-password', loginLimiter, validate(resetPasswordSchema), resetPassword);
+router.post('/resend-verification', authActionLimiter, validate(resendVerificationSchema), resendVerificationEmail);
+router.post('/forgot-password', authActionLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', authActionLimiter, validate(resetPasswordSchema), resetPassword);
 router.post('/logout', protect, logoutUser);
 router.post('/refresh', refreshToken);
 

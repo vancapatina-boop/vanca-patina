@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Download, FileText } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { downloadInvoice, getMyOrders } from "@/services/ordersService";
 
 type OrderItem = {
@@ -16,7 +18,7 @@ type Order = {
   orderItems: OrderItem[];
   totalPrice: number;
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-  paymentMethod: "COD" | "Razorpay" | "PayPal";
+  paymentMethod: "Razorpay";
   paymentStatus?: "pending" | "paid" | "failed" | "refunded";
   isPaid: boolean;
   createdAt: string;
@@ -48,14 +50,9 @@ const Orders = () => {
         if (cancelled) return;
         setOrders(Array.isArray(data) ? data : []);
       })
-      .catch((e: unknown) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-        const message =
-          typeof e === "object" && e && "response" in e
-            ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (e as any)?.response?.data?.message ?? (e as any)?.message
-            : "Failed to load orders";
-        setErrorMsg(message);
+        setErrorMsg(getApiErrorMessage(error, "Failed to load orders"));
       })
       .finally(() => {
         if (cancelled) return;
@@ -79,13 +76,8 @@ const Orders = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      const message =
-        typeof e === "object" && e && "response" in e
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (e as any)?.response?.data?.message ?? "Invoice is not available yet"
-          : "Invoice is not available yet";
-      setErrorMsg(message);
+    } catch (error: unknown) {
+      setErrorMsg(getApiErrorMessage(error, "Invoice is not available yet"));
     } finally {
       setInvoiceLoadingId(null);
     }
@@ -114,7 +106,8 @@ const Orders = () => {
         ) : (
           <div className="space-y-6">
             {orders.map((order) => {
-              const invoiceAvailable = Boolean(order.invoice?.invoiceUrl) || order.paymentStatus === "paid" || order.status === "delivered";
+              const invoiceAvailable =
+                Boolean(order.invoice?.invoiceUrl) || order.paymentStatus === "paid" || order.status === "delivered";
 
               return (
                 <div key={order._id} className="glass-card p-6">
@@ -124,7 +117,7 @@ const Orders = () => {
                       <p className="text-sm text-muted-foreground">Placed: {new Date(order.createdAt).toLocaleString()}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-foreground">Total: Rs. {order.totalPrice.toLocaleString()}</p>
+                      <p className="text-sm font-semibold text-foreground">Total: {formatCurrency(order.totalPrice)}</p>
                       <p className="text-xs text-muted-foreground">
                         {order.status} | {order.paymentMethod} | {order.paymentStatus || (order.isPaid ? "paid" : "pending")}
                       </p>
@@ -132,13 +125,15 @@ const Orders = () => {
                   </div>
 
                   <div className="mt-4 space-y-2">
-                    {order.orderItems.map((it, idx) => (
-                      <div key={`${order._id}-${idx}`} className="flex items-center justify-between gap-4">
+                    {order.orderItems.map((item, index) => (
+                      <div key={`${order._id}-${index}`} className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{it.name}</p>
-                          <p className="text-xs text-muted-foreground">Qty: {it.qty}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">Qty: {item.qty}</p>
                         </div>
-                        <p className="text-sm font-semibold text-foreground">Rs. {(it.price * it.qty).toLocaleString()}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatCurrency(item.price * item.qty)}
+                        </p>
                       </div>
                     ))}
                   </div>

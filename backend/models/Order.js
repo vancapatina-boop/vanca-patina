@@ -27,12 +27,19 @@ const orderSchema = new mongoose.Schema({
   },
   orderItems: [orderItemSchema],
   shippingAddress: {
-    address: { type: String },
+    fullName: { type: String },
+    phoneNumber: { type: String },
+    email: { type: String },
+    address1: { type: String },
+    address2: { type: String },
     city: { type: String },
+    state: { type: String },
     postalCode: { type: String },
-    country: { type: String },
+    country: { type: String, default: 'India' },
+    addressType: { type: String, enum: ['home', 'work', 'other'], default: 'home' },
+    isDefault: { type: Boolean, default: false },
   },
-  paymentMethod: { type: String, enum: ['PayPal', 'COD', 'Razorpay'], default: 'PayPal' },
+  paymentMethod: { type: String, enum: ['Razorpay'], default: 'Razorpay' },
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid', 'failed', 'refunded'],
@@ -63,7 +70,7 @@ const orderSchema = new mongoose.Schema({
     default: 'pending',
   },
   invoice: {
-    invoiceNumber: { type: String, unique: true, sparse: true, index: true },
+    invoiceNumber: { type: String, sparse: true },
     status: {
       type: String,
       enum: ['not_requested', 'ready', 'failed'],
@@ -76,7 +83,15 @@ const orderSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// Indexes for performance and uniqueness
 orderSchema.index({ user: 1 });
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ paymentStatus: 1 });
+// Unique index for webhook deduplication (allows null values)
+orderSchema.index({ 'paymentGateway.webhookEventId': 1 }, { unique: true, sparse: true });
+// Unique index for invoice number
+orderSchema.index({ 'invoice.invoiceNumber': 1 }, { unique: true, sparse: true });
 
 // Auto-generate orderId only for brand-new orders (async style for Mongoose 6+)
 orderSchema.pre('save', async function () {

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
-import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
+import { useCart } from "@/context/CartContext";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -21,7 +22,10 @@ const Cart = () => {
         <ShoppingBag className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-2xl font-display font-bold text-foreground">Your cart is empty</h2>
         <p className="text-muted-foreground mt-2 mb-6">Add some premium products to get started.</p>
-        <Link to="/shop" className="inline-flex items-center gap-2 px-8 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all">
+        <Link
+          to="/shop"
+          className="inline-flex items-center gap-2 px-8 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all"
+        >
           Continue Shopping <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
@@ -38,23 +42,37 @@ const Cart = () => {
               <motion.div key={item.product.id} layout className="glass-card p-4 flex gap-4">
                 <img src={item.product.image} alt={item.product.name} className="w-24 h-24 object-cover rounded-lg" />
                 <div className="flex-1 min-w-0">
-                  <Link to={`/product/${item.product.id}`} className="font-display font-semibold text-foreground hover:text-primary transition-colors line-clamp-1">
+                  <Link
+                    to={`/product/${item.product.id}`}
+                    className="font-display font-semibold text-foreground hover:text-primary transition-colors line-clamp-1"
+                  >
                     {item.product.name}
                   </Link>
                   <p className="text-sm text-muted-foreground mt-1">{item.product.category}</p>
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center glass rounded-lg">
-                      <button onClick={() => void updateQuantity(item.product.id, item.quantity - 1)} className="p-2 text-muted-foreground hover:text-foreground">
+                      <button
+                        onClick={() => void updateQuantity(item.product.id, item.quantity - 1)}
+                        className="p-2 text-muted-foreground hover:text-foreground"
+                      >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="px-3 text-sm text-foreground">{item.quantity}</span>
-                      <button onClick={() => void updateQuantity(item.product.id, item.quantity + 1)} className="p-2 text-muted-foreground hover:text-foreground">
+                      <button
+                        onClick={() => void updateQuantity(item.product.id, item.quantity + 1)}
+                        className="p-2 text-muted-foreground hover:text-foreground"
+                      >
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="font-semibold text-foreground">₹{(item.product.price * item.quantity).toLocaleString()}</span>
-                      <button onClick={() => void removeFromCart(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(item.product.price * item.quantity)}
+                      </span>
+                      <button
+                        onClick={() => void removeFromCart(item.product.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -68,13 +86,16 @@ const Cart = () => {
             <h3 className="font-display text-lg font-semibold text-foreground mb-6">Order Summary</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span><span>₹{totalPrice.toLocaleString()}</span>
+                <span>Subtotal</span>
+                <span>{formatCurrency(totalPrice)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Shipping</span><span>Calculated at checkout</span>
+                <span>Shipping</span>
+                <span>Calculated at checkout</span>
               </div>
               <div className="border-t border-border pt-3 flex justify-between font-semibold text-foreground">
-                <span>Total</span><span>₹{totalPrice.toLocaleString()}</span>
+                <span>Total</span>
+                <span>{formatCurrency(totalPrice)}</span>
               </div>
             </div>
             <button

@@ -15,6 +15,13 @@ const UserSchema = new mongoose.Schema({
       postalCode: { type: String },
       country: { type: String },
       isDefault: { type: Boolean, default: false },
+      fullName: { type: String },
+      phoneNumber: { type: String },
+      email: { type: String },
+      state: { type: String },
+      address1: { type: String },
+      address2: { type: String },
+      addressType: { type: String, enum: ['home', 'work', 'other'], default: 'home' },
     },
   ],
   refreshTokens: [

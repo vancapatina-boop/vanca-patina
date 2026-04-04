@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 interface LoginProps {
   defaultMode?: "login" | "signup";
@@ -81,9 +82,8 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
       await login(email, password);
       const from = location.state?.from?.pathname || "/";
       navigate(from, { replace: true });
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error.message || "Network error";
-      setErrorMsg(message);
+    } catch (error: unknown) {
+      setErrorMsg(getApiErrorMessage(error, "Network error"));
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +116,7 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
         <div className="text-center mb-8">
           <Link to="/" className="inline-block hover:scale-105 transition-transform duration-300">
             <h1 className="text-3xl font-bold tracking-widest text-[#D4AF37] font-display">
-              VANCA INTERIO
+              VANCA PATINA
             </h1>
             <p className="text-xs tracking-[0.4em] text-zinc-400 mt-2 uppercase">Patina</p>
           </Link>
@@ -162,7 +162,7 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
                         id="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Ankit Mishra"
+                        placeholder="your name"
                         className="h-12 pl-11 bg-white/5 border-white/10 focus:border-[#D4AF37]/50 text-white placeholder:text-zinc-600 transition-all focus:bg-white/10"
                         required
                         autoComplete="name"
@@ -231,13 +231,12 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
                   <div>
                     <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          passwordScore <= 2
+                        className={`h-full rounded-full transition-all ${passwordScore <= 2
                             ? "bg-red-400"
                             : passwordScore <= 4
                               ? "bg-amber-400"
                               : "bg-emerald-400"
-                        }`}
+                          }`}
                         style={{ width: `${(passwordScore / passwordRules.length) * 100}%` }}
                       />
                     </div>
@@ -246,11 +245,10 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
                       {passwordRules.map((rule) => (
                         <div
                           key={rule.label}
-                          className={`rounded-lg border px-3 py-2 text-xs ${
-                            rule.passes
+                          className={`rounded-lg border px-3 py-2 text-xs ${rule.passes
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                               : "border-white/10 bg-white/[0.03] text-zinc-500"
-                          }`}
+                            }`}
                         >
                           {rule.label}
                         </div>

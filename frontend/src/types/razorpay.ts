@@ -1,17 +1,11 @@
-declare global {
-  interface Window {
-    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
-  }
-}
-
-interface RazorpayOptions {
+export interface RazorpayOptions {
   key: string;
   amount: number;
   currency: string;
   order_id: string;
   name?: string;
   description?: string;
-  handler: (response: RazorpayResponse) => void;
+  handler: (response: RazorpayResponse) => void | Promise<void>;
   prefill?: {
     email?: string;
     contact?: string;
@@ -22,14 +16,18 @@ interface RazorpayOptions {
   };
 }
 
-interface RazorpayInstance {
+export interface RazorpayInstance {
   open: () => void;
 }
 
-interface RazorpayResponse {
+export interface RazorpayResponse {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
 }
 
-export {};
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}

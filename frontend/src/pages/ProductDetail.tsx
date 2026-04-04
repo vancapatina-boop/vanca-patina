@@ -1,24 +1,27 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ShoppingBag, Star, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader } from "lucide-react";
-import { useCart } from "@/context/CartContext";
-import { useAuth } from "@/context/AuthContext";
-import { useProducts } from "@/hooks/useProducts";
-import ProductCard from "@/components/ProductCard";
-import SectionHeading from "@/components/SectionHeading";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import api from "@/services/api";
-import { mapBackendProduct } from "@/lib/mapBackendProduct";
 import { toast } from "sonner";
+import ProductCard from "@/components/ProductCard";
+import ProductGallery from "@/components/ProductGallery";
+import SectionHeading from "@/components/SectionHeading";
+import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { useProducts } from "@/hooks/useProducts";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { mapBackendProduct } from "@/lib/mapBackendProduct";
+import api from "@/services/api";
 
-// Helper: detect URLs in text and return an array of text/link nodes
 const renderDescription = (text: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
-  return parts.map((part, i) =>
-    urlRegex.test(part) ? (
+
+  return parts.map((part, index) =>
+    /^https?:\/\/[^\s]+$/.test(part) ? (
       <a
-        key={i}
+        key={index}
         href={part}
         target="_blank"
         rel="noopener noreferrer"
@@ -27,8 +30,8 @@ const renderDescription = (text: string) => {
         {part}
       </a>
     ) : (
-      <span key={i}>{part}</span>
-    )
+      <span key={index}>{part}</span>
+    ),
   );
 };
 
@@ -48,15 +51,16 @@ const ProductDetail = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+
     api
       .get(`/api/products/${id}`)
       .then((res) => {
         if (cancelled) return;
         setProduct(mapBackendProduct(res.data));
       })
-      .catch((e) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-        setError(e?.response?.data?.message ?? e?.message ?? "Failed to load product");
+        setError(getApiErrorMessage(error, "Failed to load product"));
       })
       .finally(() => {
         if (cancelled) return;
@@ -70,19 +74,15 @@ const ProductDetail = () => {
 
   const related = useMemo(() => {
     if (!product) return [];
-    return products
-      .filter((p) => p.category === product.category && p.id !== product.id)
-      .slice(0, 4);
+    return products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
   }, [products, product]);
 
   const handleAddToCart = async () => {
-    // Prevent null product
     if (!product) {
       toast.error("Product not available");
       return;
     }
 
-    // 🔐 Check authentication
     if (!isAuthenticated) {
       toast.error("Please login to add items to cart");
       navigate("/login");
@@ -91,14 +91,11 @@ const ProductDetail = () => {
 
     try {
       setIsAddingToCart(true);
-      console.log("🛒 Adding to cart:", { productId: product.id, productName: product.name, qty });
       await addToCart(product, qty);
       toast.success(`${product.name} added to cart!`);
-      setQty(1); // Reset quantity after successful add
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
-      toast.error(message);
-      console.error("🛒 Add to cart error:", error);
+      setQty(1);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to add to cart"));
     } finally {
       setIsAddingToCart(false);
     }
@@ -116,7 +113,9 @@ const ProductDetail = () => {
     return (
       <div className="min-h-screen pt-32 text-center">
         <p className="text-muted-foreground">{error ?? "Product not found."}</p>
-        <Link to="/shop" className="text-primary mt-4 inline-block">← Back to Shop</Link>
+        <Link to="/shop" className="text-primary mt-4 inline-block">
+          Back to Shop
+        </Link>
       </div>
     );
   }
@@ -124,18 +123,28 @@ const ProductDetail = () => {
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4 lg:px-8">
-        <Link to="/shop" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-8 transition-colors">
+        <Link
+          to="/shop"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-8 transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" /> Back to Shop
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
-            <div className="glass-card overflow-hidden">
-              <img src={product.image} alt={product.name} width={800} height={800} className="w-full aspect-square object-cover" />
+            <div className="glass-card overflow-hidden rounded-xl">
+              <ProductGallery 
+                images={product.images && product.images.length > 0 ? product.images : [product.image]} 
+                productName={product.name} 
+              />
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
             {product.badge && (
               <span className="inline-block px-3 py-1 text-xs font-bold gradient-copper text-primary-foreground rounded-full mb-4">
                 {product.badge}
@@ -144,17 +153,24 @@ const ProductDetail = () => {
             <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">{product.name}</h1>
             <div className="flex items-center gap-2 mt-3">
               <div className="flex gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className={`w-4 h-4 ${i < Math.floor(product.rating) ? "fill-primary text-primary" : "text-muted"}`} />
+                {[...Array(5)].map((_, index) => (
+                  <Star
+                    key={index}
+                    className={`w-4 h-4 ${index < Math.floor(product.rating) ? "fill-primary text-primary" : "text-muted"}`}
+                  />
                 ))}
               </div>
-              <span className="text-sm text-muted-foreground">{product.rating} ({product.reviews} reviews)</span>
+              <span className="text-sm text-muted-foreground">
+                {product.rating} ({product.reviews} reviews)
+              </span>
             </div>
 
             <div className="flex items-center gap-3 mt-6">
-              <span className="text-3xl font-bold text-foreground">₹{product.price.toLocaleString()}</span>
+              <span className="text-3xl font-bold text-foreground">{formatCurrency(product.price)}</span>
               {product.originalPrice && (
-                <span className="text-lg text-muted-foreground line-through">₹{product.originalPrice.toLocaleString()}</span>
+                <span className="text-lg text-muted-foreground line-through">
+                  {formatCurrency(product.originalPrice)}
+                </span>
               )}
             </div>
 
@@ -165,14 +181,21 @@ const ProductDetail = () => {
               <span className="px-3 py-1 text-xs glass rounded-full text-muted-foreground">{product.finishType}</span>
             </div>
 
-            {/* Qty + Add to Cart */}
             <div className="flex items-center gap-4 mt-8">
               <div className="flex items-center glass rounded-lg">
-                <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-3 text-muted-foreground hover:text-foreground" disabled={isAddingToCart}>
+                <button
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                  className="p-3 text-muted-foreground hover:text-foreground"
+                  disabled={isAddingToCart}
+                >
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="px-4 text-foreground font-semibold">{qty}</span>
-                <button onClick={() => setQty(qty + 1)} className="p-3 text-muted-foreground hover:text-foreground" disabled={isAddingToCart}>
+                <button
+                  onClick={() => setQty(qty + 1)}
+                  className="p-3 text-muted-foreground hover:text-foreground"
+                  disabled={isAddingToCart}
+                >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
@@ -204,12 +227,13 @@ const ProductDetail = () => {
           </motion.div>
         </div>
 
-        {/* Related */}
         {related.length > 0 && (
           <div className="mt-24">
             <SectionHeading subtitle="You May Also Like" title="Related Products" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {related.map((p) => <ProductCard key={p.id} product={p} />)}
+              {related.map((item) => (
+                <ProductCard key={item.id} product={item} />
+              ))}
             </div>
           </div>
         )}

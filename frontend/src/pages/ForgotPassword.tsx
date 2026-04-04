@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { requestPasswordReset } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -21,8 +22,8 @@ const ForgotPassword = () => {
     try {
       const response = await requestPasswordReset(email);
       setMessage(response.message);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Unable to send reset email.");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Unable to send reset email."));
     } finally {
       setIsSubmitting(false);
     }

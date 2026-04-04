@@ -74,9 +74,15 @@ const App = () => (
                 </PrivateRoute>
               } />
 
+              <Route path="/my-orders" element={
+                <PrivateRoute>
+                  <UserDashboard initialSection="orders" />
+                </PrivateRoute>
+              } />
+
               {/* Legacy routes → redirect to dashboard */}
               <Route path="/profile" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/orders" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/orders" element={<Navigate to="/my-orders" replace />} />
 
               {/* Admin */}
               <Route path="/admin/login" element={<AdminLogin />} />

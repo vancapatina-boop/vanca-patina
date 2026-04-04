@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { resetPassword } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 const getPasswordRules = (password: string) => [
   { label: "8+ characters", passes: password.length >= 8 },
@@ -46,8 +47,8 @@ const ResetPassword = () => {
       const response = await resetPassword(token, password, confirmPassword);
       setMessage(response.message);
       setTimeout(() => navigate("/login"), 1200);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Unable to reset password.");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Unable to reset password."));
     } finally {
       setIsSubmitting(false);
     }

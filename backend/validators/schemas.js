@@ -137,17 +137,30 @@ const updateCartSchema = addToCartSchema.extend({
 });
 
 const addressSchema = z.object({
-  label: z.string().min(1).max(50).optional(),
-  address: z.string().min(5).max(300),
+  label: z.string().min(1).max(50).optional().transform((s) => s?.trim()),
+  // Legacy single-line address field (kept for backward compat)
+  address: z.string().min(5).max(300).optional(),
+  // New split address fields
+  fullName: z.string().min(2).max(200).optional().transform((s) => s?.trim()),
+  phoneNumber: z.string().min(10).max(15).optional().transform((s) => s?.trim()),
+  email: z.string().email().optional().transform((s) => s?.trim().toLowerCase()),
+  address1: z.string().min(3).max(300).optional().transform((s) => s?.trim()),
+  address2: z.string().max(300).optional().transform((s) => s?.trim()),
+  state: z.string().min(2).max(100).optional().transform((s) => s?.trim()),
+  addressType: z.enum(["home", "work", "other"]).optional().default("home"),
+  isDefault: z.boolean().optional(),
+  // Shared required fields
   city: z.string().min(2).max(100),
   postalCode: z.string().min(3).max(20),
-  country: z.string().min(2).max(100),
-  isDefault: z.boolean().optional(),
-});
+  country: z.string().min(2).max(100).default("India"),
+}).refine(
+  (data) => data.address || data.address1,
+  { message: "Either address or address1 is required", path: ["address1"] }
+);
 
 const checkoutSchema = z.object({
   shippingAddress: addressSchema,
-  paymentMethod: z.enum(["PayPal", "COD", "Razorpay"]).default("PayPal"),
+  paymentMethod: z.enum(["Razorpay"]).default("Razorpay"),
 });
 
 const createPaymentOrderSchema = z.object({

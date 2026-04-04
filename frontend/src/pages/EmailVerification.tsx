@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Mail, RefreshCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resendVerificationEmail } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
@@ -32,8 +33,8 @@ const EmailVerification = () => {
     try {
       const response = await resendVerificationEmail(email);
       setFeedback(response.message || "A new verification email has been sent.");
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Unable to resend verification email.");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Unable to resend verification email."));
     } finally {
       setIsResending(false);
     }

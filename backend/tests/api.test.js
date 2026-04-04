@@ -479,37 +479,7 @@ describe('Order API', () => {
   });
 
   describe('POST /api/orders', () => {
-    test('should create order from cart', async () => {
-      // Add to cart
-      await request(app)
-        .post('/api/cart')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          productId: productId.toString(),
-          qty: 2
-        });
-
-      // Create order
-      const res = await request(app)
-        .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          shippingAddress: {
-            address: '123 Main St',
-            city: 'Test City',
-            postalCode: '12345',
-            country: 'India'
-          },
-          paymentMethod: 'COD'
-        });
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body).toHaveProperty('_id');
-      expect(res.body.orderItems.length).toBe(1);
-      expect(res.body.status).toBe('pending');
-    });
-
-    test('should calculate correct totals', async () => {
+    test('should reject direct checkout (Razorpay-only flow)', async () => {
       await request(app)
         .post('/api/cart')
         .set('Authorization', `Bearer ${token}`)
@@ -528,91 +498,46 @@ describe('Order API', () => {
             postalCode: '12345',
             country: 'India'
           },
-          paymentMethod: 'COD'
-        });
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.itemsPrice).toBe(200); // 100 * 2
-      expect(res.body.taxPrice).toBe(10); // 200 * 0.05
-      expect(res.body.shippingPrice).toBe(75); // Not free since < 2000
-      expect(res.body.totalPrice).toBe(285); // 200 + 10 + 75
-    });
-
-    test('should reject order from empty cart', async () => {
-      const res = await request(app)
-        .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          shippingAddress: {
-            address: '123 Main St',
-            city: 'Test City',
-            postalCode: '12345',
-            country: 'India'
-          },
-          paymentMethod: 'COD'
+          paymentMethod: 'Razorpay'
         });
 
       expect(res.statusCode).toBe(400);
-      expect(res.body.message).toContain('empty');
-    });
-
-    test('should clear cart after order creation', async () => {
-      await request(app)
-        .post('/api/cart')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          productId: productId.toString(),
-          qty: 1
-        });
-
-      await request(app)
-        .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          shippingAddress: {
-            address: '123 Main St',
-            city: 'Test City',
-            postalCode: '12345',
-            country: 'India'
-          },
-          paymentMethod: 'COD'
-        });
-
-      const cartRes = await request(app)
-        .get('/api/cart')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(cartRes.body.items.length).toBe(0);
+      expect(res.body.message).toMatch(/Razorpay|payment|create-order/i);
     });
   });
 
   describe('GET /api/orders/:id', () => {
     test('should get order by id', async () => {
-      // Create order
-      const addRes = await request(app)
-        .post('/api/cart')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          productId: productId.toString(),
-          qty: 1
-        });
+      const order = await Order.create({
+        user: userId,
+        customerSnapshot: { name: 'Test User', email: 'order@example.com' },
+        orderItems: [
+          {
+            product: productId,
+            name: 'Test Product',
+            qty: 1,
+            price: 100,
+            image: ''
+          }
+        ],
+        shippingAddress: {
+          address: '123 Main St',
+          city: 'Test City',
+          postalCode: '12345',
+          country: 'India'
+        },
+        paymentMethod: 'Razorpay',
+        paymentStatus: 'paid',
+        itemsPrice: 100,
+        taxPrice: 5,
+        shippingPrice: 75,
+        totalPrice: 180,
+        isPaid: true,
+        status: 'confirmed'
+      });
 
-      const orderRes = await request(app)
-        .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          shippingAddress: {
-            address: '123 Main St',
-            city: 'Test City',
-            postalCode: '12345',
-            country: 'India'
-          },
-          paymentMethod: 'COD'
-        });
+      const orderId = order._id.toString();
 
-      const orderId = orderRes.body._id;
-
-      // Get order
       const res = await request(app)
         .get(`/api/orders/${orderId}`)
         .set('Authorization', `Bearer ${token}`);

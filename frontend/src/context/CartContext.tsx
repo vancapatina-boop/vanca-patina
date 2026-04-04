@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import { Product } from "@/types/product";
-import api from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/apiError";
 import { mapBackendProduct } from "@/lib/mapBackendProduct";
+import api from "@/services/api";
+import { BackendCart, BackendCartItem, BackendProduct } from "@/types/backend";
+import { Product } from "@/types/product";
 
 interface CartItem {
   product: Product;
@@ -24,45 +27,47 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { token } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const token = useMemo(() => localStorage.getItem("token"), []);
-
   const syncCart = useCallback(async () => {
-    const t = localStorage.getItem("token");
-    if (!t) return;
+    if (!token) return;
 
     setLoading(true);
     setError(null);
     try {
       const res = await api.get("/api/cart");
-      const backendCart = res.data;
+      const backendCart = res.data as BackendCart;
 
-      const mapped: CartItem[] = (backendCart.items ?? []).map((it: any) => ({
-        product: mapBackendProduct(it.product),
-        quantity: Number(it.qty),
-      }));
+      const mapped: CartItem[] = (backendCart.items ?? [])
+        .filter((item): item is BackendCartItem & { product: BackendProduct } => item.product != null)
+        .map((item) => ({
+          product: mapBackendProduct(item.product),
+          quantity: Number(item.qty ?? 0),
+        }));
 
       setItems(mapped);
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? "Failed to sync cart");
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Failed to sync cart"));
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    // Initial sync when the user is already logged in.
-    if (token) void syncCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  useEffect(() => {
+    if (token) {
+      void syncCart();
+      return;
+    }
+
+    setItems([]);
+    setError(null);
+  }, [syncCart, token]);
+
   const addToCart = useCallback(async (product: Product, qty: number = 1) => {
-    const t = localStorage.getItem("token");
-    if (!t) {
-      // Guest fallback (best-effort). Authenticated users will be synced from DB.
+    if (!token) {
       setItems((prev) => {
         const existing = prev.find((item) => item.product.id === product.id);
         if (existing) {
@@ -81,16 +86,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await api.post("/api/cart", { productId: product.id, qty });
       await syncCart();
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error, "Failed to add to cart");
       setError(message);
       throw error;
     }
-  }, [syncCart]);
+  }, [syncCart, token]);
 
   const removeFromCart = useCallback(async (productId: string) => {
-    const t = localStorage.getItem("token");
-    if (!t) {
+    if (!token) {
       setItems((prev) => prev.filter((item) => item.product.id !== productId));
       return;
     }
@@ -98,13 +102,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     await api.delete(`/api/cart/${productId}`);
     await syncCart();
-  }, [syncCart]);
+  }, [syncCart, token]);
 
   const updateQuantity = useCallback(async (productId: string, quantity: number) => {
     const qty = Number(quantity);
-    const t = localStorage.getItem("token");
 
-    if (!t) {
+    if (!token) {
       if (qty <= 0) {
         setItems((prev) => prev.filter((item) => item.product.id !== productId));
       } else {
@@ -123,7 +126,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     await api.put("/api/cart", { productId, qty });
     await syncCart();
-  }, [removeFromCart, syncCart]);
+  }, [removeFromCart, syncCart, token]);
 
   const clearCart = useCallback(() => setItems([]), []);
 

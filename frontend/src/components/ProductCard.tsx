@@ -1,11 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingBag, Star, Loader } from "lucide-react";
-import { Product } from "@/types/product";
-import { useCart } from "@/context/CartContext";
-import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { Product } from "@/types/product";
 
 const ProductCard = ({ product }: { product: Product }) => {
   const { addToCart } = useCart();
@@ -14,7 +16,6 @@ const ProductCard = ({ product }: { product: Product }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAddToCart = async () => {
-    // 🔐 Check authentication
     if (!isAuthenticated) {
       toast.error("Please login to add items to cart");
       navigate("/login");
@@ -25,10 +26,8 @@ const ProductCard = ({ product }: { product: Product }) => {
       setIsLoading(true);
       await addToCart(product);
       toast.success(`${product.name} added to cart!`);
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || "Failed to add to cart";
-      toast.error(message);
-      console.error("🛒 Add to cart error:", error);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to add to cart"));
     } finally {
       setIsLoading(false);
     }
@@ -55,6 +54,7 @@ const ProductCard = ({ product }: { product: Product }) => {
           </span>
         )}
       </Link>
+
       <div className="p-5">
         <div className="flex items-center gap-1 mb-2">
           <Star className="w-3.5 h-3.5 fill-primary text-primary" />
@@ -62,31 +62,31 @@ const ProductCard = ({ product }: { product: Product }) => {
             {product.rating} ({product.reviews})
           </span>
         </div>
+
         <Link to={`/product/${product.id}`}>
           <h3 className="font-display font-semibold text-foreground mb-1 line-clamp-1 hover:text-primary transition-colors">
             {product.name}
           </h3>
         </Link>
+
         <p className="text-xs text-muted-foreground mb-3 line-clamp-1">{product.shortDescription}</p>
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-foreground">₹{product.price.toLocaleString()}</span>
+            <span className="font-bold text-foreground">{formatCurrency(product.price)}</span>
             {product.originalPrice && (
               <span className="text-xs text-muted-foreground line-through">
-                ₹{product.originalPrice.toLocaleString()}
+                {formatCurrency(product.originalPrice)}
               </span>
             )}
           </div>
+
           <button
             onClick={handleAddToCart}
             disabled={isLoading}
             className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? (
-              <Loader className="w-4 h-4 animate-spin" />
-            ) : (
-              <ShoppingBag className="w-4 h-4" />
-            )}
+            {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
           </button>
         </div>
       </div>

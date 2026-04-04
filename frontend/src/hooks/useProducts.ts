@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Product } from "@/types/product";
-import api from "@/services/api";
+import { getApiErrorMessage } from "@/lib/apiError";
 import { mapBackendProduct } from "@/lib/mapBackendProduct";
+import api from "@/services/api";
+import { BackendProduct, BackendProductsPayload } from "@/types/backend";
+import { Product } from "@/types/product";
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,43 +20,22 @@ export const useProducts = () => {
       .then((res) => {
         if (cancelled) return;
 
-        // Debug: Log full response
-        console.log("📦 Products API Response:", res.data);
-
-        // Handle both response formats:
-        // Format 1: {products: [...], page: 1, pages: 1}
-        // Format 2: [...] (array directly)
-        const data = res.data;
-        let list: any[] = [];
+        const data = res.data as BackendProductsPayload;
+        let list: BackendProduct[] = [];
 
         if (Array.isArray(data)) {
-          // Direct array response
           list = data;
-        } else if (data?.products && Array.isArray(data.products)) {
-          // Wrapped response {products: [...]}
+        } else if (Array.isArray(data.products)) {
           list = data.products;
         } else {
-          // Unexpected format
-          console.error("❌ Unexpected response format:", data);
           throw new Error("Invalid response format from API");
         }
 
-        if (!Array.isArray(list) || list.length === 0) {
-          console.warn("⚠️ No products found in response");
-        }
-
-        // Map products
-        const mappedProducts = list.map(mapBackendProduct);
-        console.log("✅ Mapped products:", mappedProducts.length);
-
-        setProducts(mappedProducts);
+        setProducts(list.map(mapBackendProduct));
       })
-      .catch((e) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-
-        console.error("❌ Error fetching products:", e);
-        const msg = e?.response?.data?.message ?? e?.message ?? "Failed to load products";
-        setError(msg);
+        setError(getApiErrorMessage(error, "Failed to load products"));
       })
       .finally(() => {
         if (!cancelled) {

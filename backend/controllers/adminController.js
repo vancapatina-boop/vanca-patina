@@ -85,15 +85,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   if (status === "delivered") {
     order.isPaid = true;
     order.paidAt = order.paidAt || Date.now();
-    if (order.paymentMethod === 'COD' && order.paymentStatus !== 'paid') {
-      order.paymentStatus = 'paid';
-      order.paymentResult = {
-        ...(order.paymentResult || {}),
-        status: 'completed',
-        update_time: new Date().toISOString(),
-        email_address: order.customerSnapshot?.email,
-      };
-    }
   }
 
   if (status === "cancelled") {
@@ -226,9 +217,15 @@ const uploadAdminProductImage = asyncHandler(async (req, res) => {
   if (productId) {
     const product = await Product.findById(productId);
     if (product) {
-      product.image = url;
+      // Set as main image only if not already set (first upload = main image)
+      if (!product.image) {
+        product.image = url;
+      }
       if (!Array.isArray(product.images)) product.images = [];
-      product.images = [...product.images, url].slice(-10);
+      // Add to images array, avoid duplicates, keep last 20
+      if (!product.images.includes(url)) {
+        product.images = [...product.images, url].slice(-20);
+      }
       await product.save();
     }
   }

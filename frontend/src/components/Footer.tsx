@@ -6,7 +6,7 @@ const Footer = () => (
     <div className="container mx-auto px-4 lg:px-8 py-16">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div>
-          <h3 className="text-xl font-display font-bold text-gradient-copper mb-4">VANCA</h3>
+          <h3 className="text-xl font-display font-bold text-gradient-copper mb-4">VANCA PATINA</h3>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Premium decorative chemical solutions for metal finishes, patina effects, and artistic coatings.
           </p>
@@ -43,14 +43,14 @@ const Footer = () => (
         <div>
           <h4 className="font-semibold mb-4 text-foreground">Contact</h4>
           <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> ankit3848mishra@gmail.com</div>
-            <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-primary" /> +91 8882480459</div>
+            <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> vancapatina@gmail.com</div>
+            <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-primary" /> +91 8882359695</div>
             <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" /> New Delhi</div>
           </div>
         </div>
       </div>
       <div className="border-t border-border mt-12 pt-8 text-center text-sm text-muted-foreground">
-        © 2026 Vanca Interio Patina. All rights reserved.
+        © 2026 Vanca Patina. All rights reserved.
       </div>
     </div>
   </footer>

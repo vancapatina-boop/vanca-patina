@@ -8,9 +8,10 @@ export interface Product {
   category: string;
   finishType: string;
   image: string;
+  images?: string[];
   rating: number;
   reviews: number;
   inStock: boolean;
   badge?: string;
+  createdAt?: string;
 }
-
