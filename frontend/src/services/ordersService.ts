@@ -19,27 +19,27 @@ export interface VerifyPaymentParams {
 }
 
 export async function createPaymentOrder(params: { shippingAddress: ShippingAddress }) {
-  const res = await api.post("/api/payment/create-order", params);
+  const res = await api.post("/payment/create-order", params);
   return res.data as CreatePaymentOrderResponse;
 }
 
 export async function verifyPayment(params: VerifyPaymentParams) {
-  const res = await api.post("/api/payment/verify", params);
+  const res = await api.post("/payment/verify", params);
   return res.data;
 }
 
 export async function getMyOrders() {
-  const res = await api.get("/api/orders/my");
+  const res = await api.get("/orders/my");
   return res.data;
 }
 
 export async function getInvoice(orderId: string) {
-  const res = await api.get(`/api/invoice/${orderId}`);
+  const res = await api.get(`/invoice/${orderId}`);
   return res.data;
 }
 
 export async function getAdminInvoice(orderId: string) {
-  const res = await api.get(`/api/admin/invoice/${orderId}`);
+  const res = await api.get(`/admin/invoice/${orderId}`);
   return res.data;
 }
 
@@ -63,9 +63,9 @@ async function getInvoicePdfBlob(url: string) {
 }
 
 export async function downloadInvoice(orderId: string) {
-  return getInvoicePdfBlob(`/api/invoice/${orderId}/download`);
+  return getInvoicePdfBlob(`/invoice/${orderId}/download`);
 }
 
 export async function downloadAdminInvoice(orderId: string) {
-  return getInvoicePdfBlob(`/api/admin/invoice/${orderId}/download`);
+  return getInvoicePdfBlob(`/admin/invoice/${orderId}/download`);
 }

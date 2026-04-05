@@ -1,18 +1,8 @@
 import axios, { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
-
-const resolveApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_URL?.trim();
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
-  return "";
-};
-
-const apiBaseUrl = resolveApiBaseUrl();
+import { API_BASE_URL, buildApiUrl, normalizeApiPath } from "@/lib/apiConfig";
 
 const api = axios.create({
-  baseURL: apiBaseUrl,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -34,6 +24,10 @@ const setAuthorizationHeader = (config: InternalAxiosRequestConfig, token: strin
 };
 
 api.interceptors.request.use((config) => {
+  if (config.url) {
+    config.url = normalizeApiPath(config.url);
+  }
+
   const token = localStorage.getItem("token");
   if (token) {
     setAuthorizationHeader(config, token);
@@ -92,7 +86,7 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem("refreshToken");
-        const refreshUrl = apiBaseUrl ? `${apiBaseUrl}/api/auth/refresh` : "/api/auth/refresh";
+        const refreshUrl = buildApiUrl("/auth/refresh");
         const response = await axios.post(refreshUrl, { refreshToken });
         const { accessToken, refreshToken: newRefreshToken } = response.data;
         localStorage.setItem("token", accessToken);

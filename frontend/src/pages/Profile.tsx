@@ -26,7 +26,7 @@ const Profile = () => {
     setErrorMsg(null);
 
     api
-      .get("/api/users/profile")
+      .get("/users/profile")
       .then((res) => {
         if (cancelled) return;
         setProfile(res.data);
@@ -54,7 +54,7 @@ const Profile = () => {
     e.preventDefault();
     setErrorMsg(null);
     try {
-      const res = await api.put("/api/users/profile", form);
+      const res = await api.put("/users/profile", form);
       setProfile(res.data);
       setForm((f) => ({ ...f, password: "" }));
     } catch (error: unknown) {

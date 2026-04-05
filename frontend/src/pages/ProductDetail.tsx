@@ -53,7 +53,7 @@ const ProductDetail = () => {
     setError(null);
 
     api
-      .get(`/api/products/${id}`)
+      .get(`/products/${id}`)
       .then((res) => {
         if (cancelled) return;
         setProduct(mapBackendProduct(res.data));

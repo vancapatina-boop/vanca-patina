@@ -16,7 +16,7 @@ export const useProducts = () => {
     setError(null);
 
     api
-      .get("/api/products", { params: { pageNumber: 1, pageSize: 200 } })
+      .get("/products", { params: { pageNumber: 1, pageSize: 200 } })
       .then((res) => {
         if (cancelled) return;
 

@@ -22,7 +22,7 @@ const AdminLogin = () => {
     setErrorMsg("");
 
     try {
-      const response = await api.post("/api/auth/admin-login", { email, password });
+      const response = await api.post("/auth/admin-login", { email, password });
       const data = response.data;
 
       localStorage.setItem("token", data.accessToken);

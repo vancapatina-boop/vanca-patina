@@ -38,7 +38,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get("/api/cart");
+      const res = await api.get("/cart");
       const backendCart = res.data as BackendCart;
 
       const mapped: CartItem[] = (backendCart.items ?? [])
@@ -84,7 +84,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setError(null);
     try {
-      await api.post("/api/cart", { productId: product.id, qty });
+      await api.post("/cart", { productId: product.id, qty });
       await syncCart();
     } catch (error: unknown) {
       const message = getApiErrorMessage(error, "Failed to add to cart");
@@ -100,7 +100,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setError(null);
-    await api.delete(`/api/cart/${productId}`);
+    await api.delete(`/cart/${productId}`);
     await syncCart();
   }, [syncCart, token]);
 
@@ -124,7 +124,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setError(null);
-    await api.put("/api/cart", { productId, qty });
+    await api.put("/cart", { productId, qty });
     await syncCart();
   }, [removeFromCart, syncCart, token]);
 

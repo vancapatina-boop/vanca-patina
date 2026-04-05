@@ -205,7 +205,7 @@ const AdminDashboard = () => {
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const res = await api.get("/api/admin/stats");
+      const res = await api.get("/admin/stats");
       setStats(res.data);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Failed to load stats"));
@@ -217,7 +217,7 @@ const AdminDashboard = () => {
   const fetchProducts = useCallback(async () => {
     setProductsLoading(true);
     try {
-      const res = await api.get("/api/admin/products", { params: { page: 1, limit: 200 } });
+      const res = await api.get("/admin/products", { params: { page: 1, limit: 200 } });
       setProducts(Array.isArray(res.data?.products) ? res.data.products : []);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Failed to load products"));
@@ -229,7 +229,7 @@ const AdminDashboard = () => {
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true);
     try {
-      const res = await api.get("/api/admin/orders");
+      const res = await api.get("/admin/orders");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Failed to load orders"));
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const res = await api.get("/api/admin/users");
+      const res = await api.get("/admin/users");
       setUsers(Array.isArray(res.data) ? res.data : []);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Failed to load users"));
@@ -324,10 +324,10 @@ const AdminDashboard = () => {
 
       let savedProduct: AdminProduct;
       if (editingId) {
-        const res = await api.put(`/api/admin/products/${editingId}`, payload);
+        const res = await api.put(`/admin/products/${editingId}`, payload);
         savedProduct = res.data;
       } else {
-        const res = await api.post(`/api/admin/products`, payload);
+        const res = await api.post("/admin/products", payload);
         savedProduct = res.data;
       }
 
@@ -337,7 +337,7 @@ const AdminDashboard = () => {
           const fd = new FormData();
           fd.append("productId", savedProduct._id || editingId!);
           fd.append("image", file);
-          await api.post("/api/admin/products/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+          await api.post("/admin/products/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
         }
       }
 
@@ -354,7 +354,7 @@ const AdminDashboard = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Delete this product? This cannot be undone.")) return;
     try {
-      await api.delete(`/api/admin/products/${id}`);
+      await api.delete(`/admin/products/${id}`);
       toast.success("Product deleted");
       await fetchProducts();
     } catch (error: unknown) {
@@ -370,7 +370,7 @@ const AdminDashboard = () => {
     }
     try {
       setStatusUpdatingId(orderId);
-      await api.put(`/api/admin/orders/${orderId}`, { status });
+      await api.put(`/admin/orders/${orderId}`, { status });
       toast.success(`Order updated: ${statusConfig[status]?.label || status}`);
       await fetchOrders();
     } catch (error: unknown) {
@@ -407,7 +407,7 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (userId: string, email: string) => {
     if (!confirm(`Delete user ${email}? This will also delete their orders.`)) return;
     try {
-      await api.delete(`/api/admin/users/${userId}`);
+      await api.delete(`/admin/users/${userId}`);
       toast.success("User deleted");
       await fetchUsers();
     } catch (error: unknown) {

@@ -3,19 +3,19 @@ import api from "./api";
 // ── Profile ──────────────────────────────────────────────────────────────────
 
 export async function getProfile() {
-  const res = await api.get("/api/users/profile");
+  const res = await api.get("/users/profile");
   return res.data;
 }
 
 export async function updateProfile(data: { name?: string; email?: string; phone?: string; password?: string }) {
-  const res = await api.put("/api/users/profile", data);
+  const res = await api.put("/users/profile", data);
   return res.data;
 }
 
 // ── Addresses ────────────────────────────────────────────────────────────────
 
 export async function getAddresses() {
-  const res = await api.get("/api/users/addresses");
+  const res = await api.get("/users/addresses");
   return res.data;
 }
 
@@ -36,33 +36,33 @@ export type SavedAddressPayload = {
 };
 
 export async function addAddress(data: SavedAddressPayload) {
-  const res = await api.post("/api/users/addresses", data);
+  const res = await api.post("/users/addresses", data);
   return res.data;
 }
 
 export async function updateAddress(addressId: string, data: Partial<SavedAddressPayload>) {
-  const res = await api.put(`/api/users/addresses/${addressId}`, data);
+  const res = await api.put(`/users/addresses/${addressId}`, data);
   return res.data;
 }
 
 export async function deleteAddress(addressId: string) {
-  const res = await api.delete(`/api/users/addresses/${addressId}`);
+  const res = await api.delete(`/users/addresses/${addressId}`);
   return res.data;
 }
 
 // ── Wishlist ─────────────────────────────────────────────────────────────────
 
 export async function getWishlist() {
-  const res = await api.get("/api/wishlist");
+  const res = await api.get("/wishlist");
   return res.data;
 }
 
 export async function addToWishlist(productId: string) {
-  const res = await api.post("/api/wishlist", { productId });
+  const res = await api.post("/wishlist", { productId });
   return res.data;
 }
 
 export async function removeFromWishlist(productId: string) {
-  const res = await api.delete(`/api/wishlist/${productId}`);
+  const res = await api.delete(`/wishlist/${productId}`);
   return res.data;
 }

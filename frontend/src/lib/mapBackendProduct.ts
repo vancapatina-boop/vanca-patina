@@ -1,8 +1,7 @@
 import defaultProductImage from "@/assets/default-product.jpg";
+import { BACKEND_ORIGIN } from "@/lib/apiConfig";
 import { BackendProduct } from "@/types/backend";
 import { Product } from "@/types/product";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 function normalizeImageUrl(imagePath: string | undefined): string {
   if (!imagePath) return defaultProductImage;
@@ -12,7 +11,7 @@ function normalizeImageUrl(imagePath: string | undefined): string {
   }
 
   if (imagePath.startsWith("/uploads/")) {
-    return `${API_BASE_URL}${imagePath}`;
+    return `${BACKEND_ORIGIN}${imagePath}`;
   }
 
   return defaultProductImage;
