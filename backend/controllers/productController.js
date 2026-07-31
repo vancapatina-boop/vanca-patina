@@ -1,6 +1,7 @@
 const path = require("path");
 const fs   = require("fs");
 const Product = require("../models/product");
+const Review = require("../models/Review");
 const asyncHandler = require("../utils/asyncHandler");
 const { hasCloudinary, uploadToCloudinary, deleteFromCloudinary, getPublicId } = require("../config/cloudinary");
 
@@ -100,6 +101,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
   }
 
   await Product.deleteOne({ _id: product._id });
+  await Review.deleteMany({ productId: product._id });
   res.json({ message: "Product removed" });
 });
 

@@ -25,6 +25,10 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 400;
   }
 
+  if (err.name === 'MulterError') {
+    statusCode = 400;
+  }
+
   const payload = {
     message,
   };

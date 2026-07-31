@@ -1,10 +1,12 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, Star, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader } from "lucide-react";
+import { ShoppingBag, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import ProductCard from "@/components/ProductCard";
 import ProductGallery from "@/components/ProductGallery";
+import ProductRating from "@/components/ProductRating";
+import ProductReviews from "@/components/ProductReviews";
 import SectionHeading from "@/components/SectionHeading";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
@@ -151,19 +153,7 @@ const ProductDetail = () => {
               </span>
             )}
             <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">{product.name}</h1>
-            <div className="flex items-center gap-2 mt-3">
-              <div className="flex gap-0.5">
-                {[...Array(5)].map((_, index) => (
-                  <Star
-                    key={index}
-                    className={`w-4 h-4 ${index < Math.floor(product.rating) ? "fill-primary text-primary" : "text-muted"}`}
-                  />
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {product.rating} ({product.reviews} reviews)
-              </span>
-            </div>
+            <ProductRating rating={product.rating} count={product.reviews} className="mt-3" />
 
             <div className="flex items-center gap-3 mt-6">
               <span className="text-3xl font-bold text-foreground">{formatCurrency(product.price)}</span>
@@ -237,6 +227,11 @@ const ProductDetail = () => {
             </div>
           </div>
         )}
+
+        <ProductReviews
+          productId={product.id}
+          onRatingChange={(rating, reviews) => setProduct((current) => (current ? { ...current, rating, reviews } : current))}
+        />
       </div>
     </div>
   );
