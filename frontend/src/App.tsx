@@ -74,6 +74,12 @@ const App = () => (
                 </PrivateRoute>
               } />
 
+              <Route path="/wishlist" element={
+                <PrivateRoute>
+                  <UserDashboard initialSection="wishlist" />
+                </PrivateRoute>
+              } />
+
               <Route path="/my-orders" element={
                 <PrivateRoute>
                   <UserDashboard initialSection="orders" />

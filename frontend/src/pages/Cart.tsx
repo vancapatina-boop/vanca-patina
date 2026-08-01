@@ -3,6 +3,7 @@ import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getVariantInfo } from "@/lib/productVariant";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -38,8 +39,10 @@ const Cart = () => {
         <h1 className="text-3xl font-display font-bold text-foreground mb-8">Shopping Cart</h1>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
-              <motion.div key={item.product.id} layout className="glass-card p-4 flex gap-4">
+            {items.map((item) => {
+              const variant = getVariantInfo(item.product, item.variant);
+              return (
+              <motion.div key={`${item.product.id}:${item.variant}`} layout className="glass-card p-4 flex gap-4">
                 <img src={item.product.image} alt={item.product.name} className="w-24 h-24 object-cover rounded-lg" />
                 <div className="flex-1 min-w-0">
                   <Link
@@ -49,17 +52,20 @@ const Cart = () => {
                     {item.product.name}
                   </Link>
                   <p className="text-sm text-muted-foreground mt-1">{item.product.category}</p>
+                  {variant.label && (
+                    <p className="text-xs text-muted-foreground mt-1">Variant: {variant.label}</p>
+                  )}
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center glass rounded-lg">
                       <button
-                        onClick={() => void updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => void updateQuantity(item.product.id, item.quantity - 1, item.variant)}
                         className="p-2 text-muted-foreground hover:text-foreground"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="px-3 text-sm text-foreground">{item.quantity}</span>
                       <button
-                        onClick={() => void updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => void updateQuantity(item.product.id, item.quantity + 1, item.variant)}
                         className="p-2 text-muted-foreground hover:text-foreground"
                       >
                         <Plus className="w-3 h-3" />
@@ -67,10 +73,10 @@ const Cart = () => {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-semibold text-foreground">
-                        {formatCurrency(item.product.price * item.quantity)}
+                        {formatCurrency(variant.price * item.quantity)}
                       </span>
                       <button
-                        onClick={() => void removeFromCart(item.product.id)}
+                        onClick={() => void removeFromCart(item.product.id, item.variant)}
                         className="text-muted-foreground hover:text-destructive transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -79,7 +85,8 @@ const Cart = () => {
                   </div>
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="glass-card p-8 h-fit sticky top-24">

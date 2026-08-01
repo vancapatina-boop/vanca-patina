@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import {
   Edit, Trash2, Plus, Search, RefreshCw, Eye, X, Save, Loader2,
   Phone, Mail, UserX, ChevronRight, TrendingUp, IndianRupee,
   Package, CheckCircle2, Truck, Clock, AlertCircle, ShieldCheck,
-  ImagePlus, XCircle, BarChart3, Download, FileText
+  ImagePlus, XCircle, BarChart3, Download, FileText, Star
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,15 +31,28 @@ type AdminProduct = {
   image?: string;
   images?: string[];
   finishType?: string;
+  variants?: Record<string, AdminProductVariant>;
   ratings?: number;
   numReviews?: number;
+};
+
+type AdminProductVariant = {
+  label: string;
+  name?: string;
+  type?: string;
+  sku?: string;
+  price: number;
+  salePrice?: number;
+  stock: number;
+  images?: string[];
+  status?: "active" | "inactive";
 };
 
 type AdminOrder = {
   _id: string;
   orderId?: string;
   user?: { name?: string; email?: string; _id?: string };
-  orderItems: { name: string; qty: number; price: number; image?: string }[];
+  orderItems: { name: string; qty: number; price: number; image?: string; variantLabel?: string; variantSku?: string }[];
   totalPrice: number;
   itemsPrice?: number;
   taxPrice?: number;
@@ -50,6 +63,14 @@ type AdminOrder = {
   paymentStatus?: string;
   paidAt?: string;
   createdAt: string;
+  trackingNumber?: string;
+  courier?: string;
+  shippingPartner?: string;
+  shippingNotes?: string;
+  adminNotes?: string;
+  customerNotes?: string;
+  internalNotes?: string;
+  statusHistory?: { status: string; paymentStatus?: string; note?: string; changedAt?: string }[];
   shippingAddress?: {
     fullName?: string;
     phoneNumber?: string;
@@ -77,6 +98,22 @@ type AdminUser = {
   addresses?: AdminAddress[];
 };
 
+
+type AdminReview = {
+  _id: string;
+  rating: number;
+  title: string;
+  comment: string;
+  customerName?: string;
+  customerEmail?: string;
+  approvalStatus: "pending" | "approved" | "rejected" | "hidden";
+  verifiedPurchase?: boolean;
+  helpfulCount?: number;
+  createdAt: string;
+  productId?: { _id?: string; name?: string; image?: string };
+  userId?: { name?: string; email?: string };
+  adminReply?: { body?: string; repliedAt?: string };
+};
 type DashStats = {
   totalRevenue: number;
   totalOrders: number;
@@ -85,7 +122,7 @@ type DashStats = {
   latestOrders: AdminOrder[];
 };
 
-type Tab = "dashboard" | "products" | "orders" | "users";
+type Tab = "dashboard" | "products" | "orders" | "users" | "reviews";
 type AdminAddress = {
   _id?: string;
   label?: string;
@@ -94,6 +131,19 @@ type AdminAddress = {
   postalCode?: string;
   country?: string;
   isDefault?: boolean;
+};
+
+type VariantForm = {
+  key: string;
+  label: string;
+  name: string;
+  type: string;
+  sku: string;
+  price: string;
+  salePrice: string;
+  stock: string;
+  images: string;
+  status: "active" | "inactive";
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -145,10 +195,66 @@ function canDownloadInvoice(o: AdminOrder) {
   return orderIsPaid(o) || o.status === "delivered";
 }
 
+const emptyVariant = (): VariantForm => ({
+  key: "",
+  label: "",
+  name: "",
+  type: "",
+  sku: "",
+  price: "",
+  salePrice: "",
+  stock: "",
+  images: "",
+  status: "active",
+});
+
+function productVariantsToForm(variants?: Record<string, AdminProductVariant>): VariantForm[] {
+  return Object.entries(variants ?? {}).map(([key, variant]) => ({
+    key,
+    label: variant.label || variant.name || key,
+    name: variant.name || variant.label || key,
+    type: variant.type || "",
+    sku: variant.sku || "",
+    price: String(variant.price ?? ""),
+    salePrice: variant.salePrice == null ? "" : String(variant.salePrice),
+    stock: String(variant.stock ?? ""),
+    images: (variant.images || []).join(", "),
+    status: variant.status === "inactive" ? "inactive" : "active",
+  }));
+}
+
+function variantFormToPayload(variants: VariantForm[]) {
+  return variants.reduce<Record<string, Omit<AdminProductVariant, "label"> & { label: string }>>((acc, variant, index) => {
+    const label = (variant.label || variant.name || variant.key).trim();
+    if (!label) return acc;
+    const key = (variant.key || label || `variant-${index + 1}`).trim();
+    acc[key] = {
+      label,
+      name: variant.name.trim() || label,
+      type: variant.type.trim(),
+      sku: variant.sku.trim(),
+      price: Number(variant.price || 0),
+      salePrice: variant.salePrice === "" ? undefined : Number(variant.salePrice),
+      stock: Number(variant.stock || 0),
+      images: variant.images.split(",").map((image) => image.trim()).filter(Boolean),
+      status: variant.status,
+    };
+    return acc;
+  }, {});
+}
+
+const emptyForm = {
+  name: "",
+  category: "",
+  finishType: "Standard",
+  description: "",
+};
+
 const sidebarItems: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "products", label: "Products", icon: PackageOpen },
   { id: "orders", label: "Orders", icon: ShoppingCart },
+  { id: "reviews", label: "Reviews", icon: Star },
   { id: "users", label: "Users", icon: Users },
 ];
 
@@ -167,6 +273,15 @@ const AdminDashboard = () => {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productSearch, setProductSearch] = useState("");
 
+  // Users
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  // Reviews
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState("all");
+
   // Orders
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -174,19 +289,11 @@ const AdminDashboard = () => {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
-
-  // Users
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userSearch, setUserSearch] = useState("");
-
-  // Product form
-  const emptyForm = useMemo(() => ({
-    name: "", price: "", category: "", description: "", stock: "", finishType: "Standard",
-  }), []);
+  const [orderForms, setOrderForms] = useState<Record<string, Partial<AdminOrder>>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [productForm, setProductForm] = useState(emptyForm);
-  // Multi-image support
+  const [v250ml, setV250ml] = useState<{ enabled: boolean; price: string; stock: string }>({ enabled: true, price: "", stock: "" });
+  const [v1000ml, setV1000ml] = useState<{ enabled: boolean; price: string; stock: string }>({ enabled: true, price: "", stock: "" });
   const [productImageFiles, setProductImageFiles] = useState<File[]>([]);
   const [productImagePreviews, setProductImagePreviews] = useState<string[]>([]);
   const [productImageUrl, setProductImageUrl] = useState("");
@@ -194,6 +301,18 @@ const AdminDashboard = () => {
   const [saving, setSaving] = useState(false);
 
   // Auth check
+
+  const fetchReviews = useCallback(async () => {
+    setReviewsLoading(true);
+    try {
+      const res = await api.get("/admin/reviews", { params: { status: reviewFilter, limit: 100 } });
+      setReviews(Array.isArray(res.data?.reviews) ? res.data.reviews : []);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to load reviews"));
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [reviewFilter]);
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
@@ -236,6 +355,7 @@ const AdminDashboard = () => {
     } finally {
       setOrdersLoading(false);
     }
+
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -254,14 +374,17 @@ const AdminDashboard = () => {
     if (activeTab === "dashboard") fetchStats();
     if (activeTab === "products") fetchProducts();
     if (activeTab === "orders") fetchOrders();
+    if (activeTab === "reviews") fetchReviews();
     if (activeTab === "users") fetchUsers();
-  }, [activeTab, fetchStats, fetchProducts, fetchOrders, fetchUsers]);
+  }, [activeTab, fetchStats, fetchProducts, fetchOrders, fetchReviews, fetchUsers]);
 
   // ── Product handlers ──────────────────────────────────────────────────
 
   const resetProductForm = () => {
     setEditingId(null);
     setProductForm(emptyForm);
+    setV250ml({ enabled: true, price: "", stock: "" });
+    setV1000ml({ enabled: true, price: "", stock: "" });
     setProductImageFiles([]);
     setProductImagePreviews([]);
     setProductImageUrl("");
@@ -271,10 +394,27 @@ const AdminDashboard = () => {
   const startEdit = (p: AdminProduct) => {
     setEditingId(p._id);
     setProductForm({
-      name: p.name, price: String(p.price), category: p.category,
-      description: p.description, stock: String(p.stock), finishType: p.finishType || "Standard",
+      name: p.name,
+      category: p.category,
+      description: p.description,
+      finishType: p.finishType || "Standard",
     });
-    // Pre-populate existing images from DB
+
+    const v250 = p.variants?.["250ml"] || p.variants?.["250 ml"];
+    const v1000 = p.variants?.["1000ml"] || p.variants?.["1000 ml"];
+
+    setV250ml({
+      enabled: !!v250 || Object.keys(p.variants ?? {}).length === 0,
+      price: v250 ? String(v250.price ?? "") : "",
+      stock: v250 ? String(v250.stock ?? "") : "",
+    });
+
+    setV1000ml({
+      enabled: !!v1000 || Object.keys(p.variants ?? {}).length === 0,
+      price: v1000 ? String(v1000.price ?? "") : "",
+      stock: v1000 ? String(v1000.stock ?? "") : "",
+    });
+
     const existingImgs = [p.image, ...(p.images || [])].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
     setProductImageUrl(existingImgs[0] || "");
     setProductImagePreviews(existingImgs);
@@ -288,7 +428,6 @@ const AdminDashboard = () => {
     const newPreviews = files.map(f => URL.createObjectURL(f));
     setProductImageFiles(prev => [...prev, ...files]);
     setProductImagePreviews(prev => [...prev, ...newPreviews]);
-    // reset input so same file can be re-added if needed
     e.target.value = "";
   };
 
@@ -301,6 +440,30 @@ const AdminDashboard = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      const variantsPayload: Record<string, { label: string; price: number; stock: number }> = {};
+
+      if (v250ml.enabled && (v250ml.price !== "" || v250ml.stock !== "")) {
+        variantsPayload["250ml"] = {
+          label: "250ml",
+          price: Number(v250ml.price || 0),
+          stock: Number(v250ml.stock || 0),
+        };
+      }
+
+      if (v1000ml.enabled && (v1000ml.price !== "" || v1000ml.stock !== "")) {
+        variantsPayload["1000ml"] = {
+          label: "1000ml",
+          price: Number(v1000ml.price || 0),
+          stock: Number(v1000ml.stock || 0),
+        };
+      }
+
+      const calculatedPrice = v250ml.enabled && v250ml.price
+        ? Number(v250ml.price)
+        : (v1000ml.enabled && v1000ml.price ? Number(v1000ml.price) : 0);
+
+      const calculatedStock = (v250ml.enabled ? Number(v250ml.stock || 0) : 0) + (v1000ml.enabled ? Number(v1000ml.stock || 0) : 0);
+
       const payload: {
         name: string;
         price: number;
@@ -309,15 +472,17 @@ const AdminDashboard = () => {
         stock: number;
         finishType: string;
         image?: string;
+        variants?: Record<string, { label: string; price: number; stock: number }>;
       } = {
         name: productForm.name,
-        price: Number(productForm.price),
+        price: calculatedPrice,
         category: productForm.category,
         description: productForm.description,
-        stock: Number(productForm.stock),
+        stock: calculatedStock,
         finishType: productForm.finishType,
+        variants: Object.keys(variantsPayload).length > 0 ? variantsPayload : undefined,
       };
-      // Use URL field if no file is selected and no existing previews
+
       if (productImageUrl && productImageFiles.length === 0 && productImagePreviews.length === 0) {
         payload.image = productImageUrl;
       }
@@ -380,6 +545,29 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSaveOrderDetails = async (order: AdminOrder) => {
+    const form = orderForms[order._id] || {};
+    try {
+      setStatusUpdatingId(order._id);
+      await api.put(`/admin/orders/${order._id}`, {
+        paymentStatus: form.paymentStatus,
+        trackingNumber: form.trackingNumber ?? order.trackingNumber ?? "",
+        courier: form.courier ?? order.courier ?? "",
+        shippingPartner: form.shippingPartner ?? order.shippingPartner ?? "",
+        shippingNotes: form.shippingNotes ?? order.shippingNotes ?? "",
+        adminNotes: form.adminNotes ?? order.adminNotes ?? "",
+        customerNotes: form.customerNotes ?? order.customerNotes ?? "",
+        internalNotes: form.internalNotes ?? order.internalNotes ?? "",
+      });
+      toast.success("Order details saved");
+      await fetchOrders();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to save order details"));
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
   const handleDownloadInvoice = async (order: AdminOrder) => {
     const orderId = order._id;
     try {
@@ -399,6 +587,30 @@ const AdminDashboard = () => {
       toast.error(getApiErrorMessage(error, "Invoice is not available yet"));
     } finally {
       setInvoiceLoadingId(null);
+    }
+  };
+
+
+  const handleUpdateReview = async (reviewId: string, approvalStatus: AdminReview["approvalStatus"]) => {
+    try {
+      await api.put(`/admin/reviews/${reviewId}`, { approvalStatus });
+      toast.success(`Review marked ${approvalStatus}`);
+      await fetchReviews();
+      await fetchProducts();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to update review"));
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm("Delete this review? This cannot be undone.")) return;
+    try {
+      await api.delete(`/admin/reviews/${reviewId}`);
+      toast.success("Review deleted");
+      await fetchReviews();
+      await fetchProducts();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to delete review"));
     }
   };
 
@@ -559,7 +771,10 @@ const AdminDashboard = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-zinc-200 truncate">{p.name}</p>
-                    <p className="text-xs text-zinc-500">{p.finishType || "Standard"} | Rating {p.ratings || 0}</p>
+                    <p className="text-xs text-zinc-500">
+                      {p.finishType || "Standard"} | Rating {p.ratings || 0}
+                      {p.variants && Object.keys(p.variants).length > 0 ? ` | ${Object.keys(p.variants).length} variants` : ""}
+                    </p>
                   </div>
                   <span className="text-xs text-zinc-400 truncate">{p.category}</span>
                   <span className="text-sm font-semibold text-zinc-200 text-right">{formatCurrency(p.price)}</span>
@@ -633,16 +848,7 @@ const AdminDashboard = () => {
                   <label className="text-xs text-zinc-400 mb-1 block">Category *</label>
                   <Input value={productForm.category} onChange={e => setProductForm(f => ({ ...f, category: e.target.value }))} required className="bg-white/5 border-white/10 text-white text-sm" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Price (INR) *</label>
-                    <Input type="number" min="0" value={productForm.price} onChange={e => setProductForm(f => ({ ...f, price: e.target.value }))} required className="bg-white/5 border-white/10 text-white text-sm" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Stock *</label>
-                    <Input type="number" min="0" value={productForm.stock} onChange={e => setProductForm(f => ({ ...f, stock: e.target.value }))} required className="bg-white/5 border-white/10 text-white text-sm" />
-                  </div>
-                </div>
+
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Finish Type</label>
                   <select value={productForm.finishType} onChange={e => setProductForm(f => ({ ...f, finishType: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm">
@@ -665,6 +871,105 @@ const AdminDashboard = () => {
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Image URL (optional)</label>
                   <Input value={productImageUrl} onChange={e => setProductImageUrl(e.target.value)} placeholder="https://... or /uploads/img.jpg" className="bg-white/5 border-white/10 text-white text-sm" />
+                </div>
+                {/* Product Variants (250ml & 1000ml) */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-[#D4AF37]" /> Product Size Variants
+                      </p>
+                      <p className="text-xs text-zinc-400">Specify price & stock for 250ml and 1000ml sizes</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* 250ml Variant */}
+                    <div className={`rounded-lg border p-3 transition-all ${v250ml.enabled ? "border-[#D4AF37]/40 bg-[#D4AF37]/5" : "border-white/5 bg-white/[0.01] opacity-50"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-zinc-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={v250ml.enabled}
+                            onChange={(e) => setV250ml(v => ({ ...v, enabled: e.target.checked }))}
+                            className="rounded border-white/20 bg-white/5 text-[#D4AF37] focus:ring-[#D4AF37]"
+                          />
+                          250 ml Variant
+                        </label>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-zinc-400 font-mono">250ml</span>
+                      </div>
+
+                      {v250ml.enabled && (
+                        <div className="grid grid-cols-2 gap-2.5 pt-1">
+                          <div>
+                            <label className="text-[11px] text-zinc-400 mb-1 block">Price (₹) *</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="e.g. 1000"
+                              value={v250ml.price}
+                              onChange={(e) => setV250ml(v => ({ ...v, price: e.target.value }))}
+                              className="bg-white/5 border-white/10 text-white text-xs h-8"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-zinc-400 mb-1 block">Stock (Units) *</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="e.g. 10"
+                              value={v250ml.stock}
+                              onChange={(e) => setV250ml(v => ({ ...v, stock: e.target.value }))}
+                              className="bg-white/5 border-white/10 text-white text-xs h-8"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 1000ml Variant */}
+                    <div className={`rounded-lg border p-3 transition-all ${v1000ml.enabled ? "border-[#D4AF37]/40 bg-[#D4AF37]/5" : "border-white/5 bg-white/[0.01] opacity-50"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-zinc-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={v1000ml.enabled}
+                            onChange={(e) => setV1000ml(v => ({ ...v, enabled: e.target.checked }))}
+                            className="rounded border-white/20 bg-white/5 text-[#D4AF37] focus:ring-[#D4AF37]"
+                          />
+                          1000 ml Variant
+                        </label>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-zinc-400 font-mono">1000ml</span>
+                      </div>
+
+                      {v1000ml.enabled && (
+                        <div className="grid grid-cols-2 gap-2.5 pt-1">
+                          <div>
+                            <label className="text-[11px] text-zinc-400 mb-1 block">Price (₹) *</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="e.g. 3500"
+                              value={v1000ml.price}
+                              onChange={(e) => setV1000ml(v => ({ ...v, price: e.target.value }))}
+                              className="bg-white/5 border-white/10 text-white text-xs h-8"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-zinc-400 mb-1 block">Stock (Units) *</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="e.g. 5"
+                              value={v1000ml.stock}
+                              onChange={(e) => setV1000ml(v => ({ ...v, stock: e.target.value }))}
+                              className="bg-white/5 border-white/10 text-white text-xs h-8"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1.5 flex items-center gap-1.5 block">
@@ -733,7 +1038,12 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredOrders.map(o => (
+          {filteredOrders.map(o => {
+            const orderForm = orderForms[o._id] || {};
+            const setOrderField = (field: keyof AdminOrder, value: string) => {
+              setOrderForms((prev) => ({ ...prev, [o._id]: { ...(prev[o._id] || {}), [field]: value } }));
+            };
+            return (
             <div key={o._id} className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
               {/* Order header */}
               <div
@@ -775,7 +1085,16 @@ const AdminDashboard = () => {
                             <div className="w-10 h-10 rounded bg-white/5 overflow-hidden shrink-0">
                               {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-4 h-4 text-zinc-600 m-auto mt-3" />}
                             </div>
-                            <span className="text-sm text-zinc-300 flex-1">{item.name}</span>
+                            <span className="text-sm text-zinc-300 flex-1">
+                              {item.name}
+                              {(item.variantLabel || item.variantSku) && (
+                                <span className="block text-xs text-zinc-500">
+                                  {item.variantLabel ? `Variant: ${item.variantLabel}` : ""}
+                                  {item.variantLabel && item.variantSku ? " | " : ""}
+                                  {item.variantSku ? `SKU: ${item.variantSku}` : ""}
+                                </span>
+                              )}
+                            </span>
                             <span className="text-xs text-zinc-500">Qty: {item.qty}</span>
                             <span className="text-sm font-medium text-zinc-200">{formatCurrency(item.price * item.qty)}</span>
                           </div>
@@ -820,6 +1139,65 @@ const AdminDashboard = () => {
                           </p>
                           {o.shippingPrice !== undefined && (
                             <p className="text-xs text-zinc-500">Shipping: {formatCurrency(o.shippingPrice ?? 0)} | Tax: {formatCurrency(o.taxPrice ?? 0)}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                        <div className="space-y-3">
+                          <p className="text-xs text-zinc-500 uppercase tracking-wider">Order Management</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Payment Status</label>
+                              <select
+                                value={orderForm.paymentStatus ?? o.paymentStatus ?? (o.isPaid ? "paid" : "pending")}
+                                onChange={e => setOrderField("paymentStatus", e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="paid">Paid</option>
+                                <option value="failed">Failed</option>
+                                <option value="refunded">Refunded</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Tracking Number</label>
+                              <Input value={orderForm.trackingNumber ?? o.trackingNumber ?? ""} onChange={e => setOrderField("trackingNumber", e.target.value)} className="bg-white/5 border-white/10 text-white text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Courier</label>
+                              <Input value={orderForm.courier ?? o.courier ?? ""} onChange={e => setOrderField("courier", e.target.value)} className="bg-white/5 border-white/10 text-white text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Shipping Partner</label>
+                              <Input value={orderForm.shippingPartner ?? o.shippingPartner ?? ""} onChange={e => setOrderField("shippingPartner", e.target.value)} className="bg-white/5 border-white/10 text-white text-sm" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <textarea value={orderForm.shippingNotes ?? o.shippingNotes ?? ""} onChange={e => setOrderField("shippingNotes", e.target.value)} placeholder="Shipping notes" rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none" />
+                            <textarea value={orderForm.adminNotes ?? o.adminNotes ?? ""} onChange={e => setOrderField("adminNotes", e.target.value)} placeholder="Admin notes" rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none" />
+                            <textarea value={orderForm.customerNotes ?? o.customerNotes ?? ""} onChange={e => setOrderField("customerNotes", e.target.value)} placeholder="Customer notes" rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none" />
+                            <textarea value={orderForm.internalNotes ?? o.internalNotes ?? ""} onChange={e => setOrderField("internalNotes", e.target.value)} placeholder="Internal notes" rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none" />
+                          </div>
+                          <Button size="sm" disabled={statusUpdatingId === o._id} onClick={() => handleSaveOrderDetails(o)} className="bg-[#D4AF37] text-black hover:bg-[#D4AF37]/90">
+                            <Save className="w-3.5 h-3.5 mr-1" /> Save Order Details
+                          </Button>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Order Timeline</p>
+                          {o.statusHistory && o.statusHistory.length > 0 ? (
+                            <div className="space-y-2">
+                              {o.statusHistory.slice().reverse().map((entry, idx) => (
+                                <div key={idx} className="border-l border-[#D4AF37]/30 pl-3 py-1">
+                                  <p className="text-sm text-zinc-300">{statusConfig[entry.status]?.label || entry.status} {entry.paymentStatus ? `| ${entry.paymentStatus}` : ""}</p>
+                                  <p className="text-xs text-zinc-500">{entry.changedAt ? new Date(entry.changedAt).toLocaleString("en-IN") : "No date"}</p>
+                                  {entry.note && <p className="text-xs text-zinc-400 mt-1">{entry.note}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-zinc-500">No timeline entries yet.</p>
                           )}
                         </div>
                       </div>
@@ -887,12 +1265,87 @@ const AdminDashboard = () => {
                 )}
               </AnimatePresence>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 
+
+  const renderReviews = () => {
+    const filters = ["all", "pending", "approved", "rejected", "hidden"];
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {filters.map((status) => (
+            <button
+              key={status}
+              onClick={() => setReviewFilter(status)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                reviewFilter === status
+                  ? "bg-[#D4AF37] text-black border-[#D4AF37]"
+                  : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"
+              }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => fetchReviews()} className="ml-auto border-white/10 text-zinc-400 hover:bg-white/5">
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${reviewsLoading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+
+        {reviewsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-[#D4AF37]" />
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="bg-white/[0.03] border border-white/10 rounded-xl p-8 text-center">
+            <Star className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+            <p className="text-zinc-400">No reviews found.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reviews.map((review) => (
+              <div key={review._id} className="bg-white/[0.03] border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-100 truncate">{review.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {review.productId?.name || "Unknown product"} | {review.customerName || review.userId?.name || "Customer"} | {new Date(review.createdAt).toLocaleDateString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20">{Number(review.rating || 0).toFixed(1)} *</Badge>
+                    <Badge className="bg-white/5 text-zinc-300 border-white/10">{review.approvalStatus}</Badge>
+                  </div>
+                </div>
+
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{review.comment}</p>
+
+                {review.adminReply?.body && (
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-3 text-sm text-zinc-300">
+                    <span className="text-[#D4AF37] font-medium">Reply:</span> {review.adminReply.body}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                  <Button size="sm" onClick={() => handleUpdateReview(review._id, "approved")} className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/20">Approve</Button>
+                  <Button size="sm" onClick={() => handleUpdateReview(review._id, "hidden")} className="bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/20">Hide</Button>
+                  <Button size="sm" onClick={() => handleUpdateReview(review._id, "rejected")} className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/20">Reject</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDeleteReview(review._id)} className="ml-auto border-red-500/20 text-red-300 hover:bg-red-500/10">
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
   const renderUsers = () => (
     <div className="space-y-4">
       {/* Search */}
@@ -978,6 +1431,7 @@ const AdminDashboard = () => {
     dashboard: renderDashboard,
     products: renderProducts,
     orders: renderOrders,
+    reviews: renderReviews,
     users: renderUsers,
   };
 

@@ -20,20 +20,22 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-[#D4AF37] mx-auto mb-4" />
-          <p className="text-zinc-400">Loading...</p>
+          <p className="text-zinc-400">Loading admin portal...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    // Redirect to login with return url
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  if (requireAdmin) {
+    const localToken = localStorage.getItem("token");
+    const localRole = localStorage.getItem("role");
+    const isAdmin = (user?.role === "admin") || (!!localToken && localRole === "admin");
 
-  if (requireAdmin && user?.role !== "admin") {
-    // Redirect to home if not admin
-    return <Navigate to="/" replace />;
+    if (!isAdmin) {
+      return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    }
+  } else if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -15,11 +15,26 @@ export interface BackendProduct {
   reviews?: number | string;
   badge?: string;
   createdAt?: string;
+  variants?: Record<string, {
+    label?: string;
+    name?: string;
+    type?: string;
+    sku?: string;
+    price?: number | string;
+    salePrice?: number | string;
+    stock?: number | string;
+    images?: string[];
+    status?: "active" | "inactive";
+  }>;
 }
 
 export interface BackendCartItem {
   product: BackendProduct | null;
   qty?: number | string;
+  variantKey?: string;
+  variantLabel?: string;
+  variantPrice?: number | string;
+  variantSku?: string;
 }
 
 export interface BackendCart {
@@ -38,6 +53,7 @@ export type BackendProductsPayload = BackendProduct[] | BackendProductsResponse;
 export interface ShippingAddress {
   fullName?: string;
   phoneNumber?: string;
+  gstNumber?: string;
   email?: string;
   address1?: string;
   address2?: string;
@@ -61,6 +77,7 @@ export interface AddressRecord {
   isDefault: boolean;
   fullName?: string;
   phoneNumber?: string;
+  gstNumber?: string;
   email?: string;
   state?: string;
   address1?: string;

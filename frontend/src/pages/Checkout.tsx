@@ -1,19 +1,19 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/context/CartContext";
-import { createPaymentOrder, verifyPayment, type ShippingAddress } from "@/services/ordersService";
+import { checkoutOrder, type ShippingAddress } from "@/services/ordersService";
 import { addAddress, updateAddress, getProfile } from "@/services/dashboardService";
 import type { AddressRecord } from "@/types/backend";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getVariantInfo } from "@/lib/productVariant";
 import { CreditCard, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import "@/types/razorpay";
-import type { RazorpayOptions, RazorpayResponse } from "@/types/razorpay";
 
 interface FormState extends ShippingAddress {
   fullName: string;
   phoneNumber: string;
+  gstNumber?: string;
   email: string;
   address1: string;
   address2: string;
@@ -54,6 +54,7 @@ function savedRecordToForm(addr: AddressRecord, profile: { name: string; email: 
   return {
     fullName: (addr.fullName || profile.name || "").trim(),
     phoneNumber: normalizePhone10(addr.phoneNumber || profile.phone || ""),
+    gstNumber: (addr.gstNumber || "").trim(),
     email: (addr.email || profile.email || "").trim(),
     address1: line1,
     address2: (addr.address2 || "").trim(),
@@ -78,6 +79,7 @@ function formToSavedPayload(form: FormState) {
     country: form.country.trim() || "India",
     fullName: form.fullName.trim(),
     phoneNumber: form.phoneNumber.trim(),
+    gstNumber: form.gstNumber?.trim() || undefined,
     email: form.email.trim(),
     addressType: form.addressType,
     isDefault: true,
@@ -86,13 +88,19 @@ function formToSavedPayload(form: FormState) {
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { items, loading: cartLoading, error: cartError } = useCart();
+  const {
+    items,
+    loading: cartLoading,
+    error: cartError,
+    orderPricing,
+    totalMl,
+    syncCart,
+    hydrateCartFromStorage,
+  } = useCart();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<AddressRecord[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [selectedSavedId, setSelectedSavedId] = useState<string | "new">("new");
@@ -102,6 +110,7 @@ const Checkout = () => {
   const [shippingAddress, setShippingAddress] = useState<FormState>({
     fullName: '',
     phoneNumber: '',
+    gstNumber: '',
     email: '',
     address1: '',
     address2: '',
@@ -113,23 +122,28 @@ const Checkout = () => {
   });
 
   useEffect(() => {
-    if (window.Razorpay) {
-      setRazorpayLoaded(true);
+    const savedItems = (() => {
+      try {
+        const rawCart = localStorage.getItem("vp-cart-items");
+        const parsedCart = rawCart ? JSON.parse(rawCart) : [];
+        return Array.isArray(parsedCart) ? parsedCart : [];
+      } catch (error) {
+        console.error("[Checkout] Failed to read cart from localStorage", error);
+        return [];
+      }
+    })();
+
+    console.log("[Checkout] Cart state", items);
+    console.log("[Checkout] localStorage cart", savedItems);
+
+    if (cartLoading || items.length > 0 || savedItems.length === 0) {
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => setRazorpayLoaded(true);
-    script.onerror = () => console.error("Failed to load Razorpay script");
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
+    console.log("[Checkout] Rehydrating cart from localStorage");
+    hydrateCartFromStorage();
+    void syncCart();
+  }, [cartLoading, hydrateCartFromStorage, items, syncCart]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -220,10 +234,6 @@ const Checkout = () => {
     setErrorMsg(null);
 
     try {
-      if (!razorpayLoaded) {
-        throw new Error("Razorpay is not loaded yet. Please try again.");
-      }
-
       if (saveAddressForNextTime) {
         try {
           const payload = formToSavedPayload(shippingAddress);
@@ -272,56 +282,11 @@ const Checkout = () => {
         }
       }
 
-      const orderData = await createPaymentOrder({ shippingAddress });
-
-      const options: RazorpayOptions = {
-        key: orderData.key,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        order_id: orderData.orderId,
-        name: "Vanca Patina",
-        description: "Purchase from Vanca Patina",
-        handler: async (response: RazorpayResponse) => {
-          try {
-            setIsVerifyingPayment(true);
-            toast.info("Processing payment...");
-
-            await verifyPayment({
-              appOrderId: orderData.appOrderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-
-            toast.success("Payment successful! Order created successfully.");
-            window.location.href = "/my-orders";
-          } catch (verifyError: unknown) {
-            const errorMessage = getApiErrorMessage(verifyError, "Payment verification failed");
-            setErrorMsg(errorMessage);
-            toast.error(errorMessage);
-            setIsSubmitting(false);
-          } finally {
-            setIsVerifyingPayment(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            // User closed the payment modal without completing payment
-            setIsSubmitting(false);
-            toast.error("Payment was cancelled");
-          },
-        },
-        prefill: {
-          email: shippingAddress.email || "",
-          contact: shippingAddress.phoneNumber || "",
-        },
-        theme: {
-          color: "#8B4513",
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+      await checkoutOrder({ shippingAddress, paymentMethod: "COD" });
+      toast.success("Order placed successfully.");
+      await syncCart();
+      navigate("/my-orders");
+      return;
     } catch (error: unknown) {
       setErrorMsg(getApiErrorMessage(error, "Checkout failed"));
       setIsSubmitting(false);
@@ -342,10 +307,10 @@ const Checkout = () => {
     );
   }
 
-  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const tax = Number((subtotal * 0.05).toFixed(2));
-  const shipping = subtotal > 0 && subtotal <= 2000 ? 75 : 0;
-  const grandTotal = subtotal + tax + shipping;
+  const subtotal = orderPricing.itemsPrice;
+  const shipping = orderPricing.shippingPrice;
+  const tax = orderPricing.taxPrice;
+  const grandTotal = orderPricing.totalPrice;
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -461,6 +426,17 @@ const Checkout = () => {
                     />
                     {formErrors.phoneNumber && <p className="text-xs text-destructive mt-1">{formErrors.phoneNumber}</p>}
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-2">GST Number (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Enter GST number"
+                    value={shippingAddress.gstNumber || ''}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, gstNumber: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg bg-secondary border border-border text-foreground transition-colors"
+                  />
                 </div>
 
                 {/* Email */}
@@ -582,8 +558,8 @@ const Checkout = () => {
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <CreditCard className="w-5 h-5 text-primary flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Razorpay Secure Payment</p>
-                    <p className="text-xs text-muted-foreground">Safe & secure online payment</p>
+                    <p className="text-sm font-medium text-foreground">Order Now, Pay Later</p>
+                    <p className="text-xs text-muted-foreground">Online payment is temporarily disabled while Cashfree is finalized.</p>
                   </div>
                 </div>
               </div>
@@ -599,10 +575,10 @@ const Checkout = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={!canSubmit || isSubmitting || isVerifyingPayment || addressesLoading}
+                disabled={!canSubmit || isSubmitting || addressesLoading}
                 className="w-full mt-6 px-6 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isVerifyingPayment ? 'Processing order...' : isSubmitting ? 'Processing...' : `Proceed to Payment - ${formatCurrency(grandTotal)}`}
+                {isSubmitting ? 'Placing order...' : `Place Order - ${formatCurrency(grandTotal)}` }
               </button>
             </form>
           </div>
@@ -616,8 +592,10 @@ const Checkout = () => {
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                  {items.map((item) => (
-                    <div key={item.product.id} className="flex items-start gap-3 pb-3 border-b border-border/50">
+                  {items.map((item) => {
+                    const line = getVariantInfo(item.product, item.variant);
+                    return (
+                    <div key={`${item.product.id}-${item.variant}`} className="flex items-start gap-3 pb-3 border-b border-border/50">
                       {item.product.image && (
                         <img
                           src={item.product.image}
@@ -627,39 +605,34 @@ const Checkout = () => {
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{item.product.name}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.variant} · Qty: {item.quantity}
+                        </p>
                         <p className="text-sm font-semibold text-foreground">
-                          {formatCurrency(item.product.price * item.quantity)}
+                          {formatCurrency(line.price * item.quantity)}
                         </p>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="border-t border-border pt-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">Product total</span>
                     <span className="font-medium text-foreground">{formatCurrency(subtotal)}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="font-medium text-foreground">{formatCurrency(shipping)}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground -mt-1">
+                    Volume-based: {totalMl.toLocaleString("en-IN")} ml total. Tax is calculated on products.
+                  </p>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tax (5%)</span>
                     <span className="font-medium text-foreground">{formatCurrency(tax)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping</span>
-                    <span className="font-medium text-foreground">
-                      {shipping === 0 ? (
-                        <span className="text-emerald-600">FREE</span>
-                      ) : (
-                        formatCurrency(shipping)
-                      )}
-                    </span>
-                  </div>
-                  {shipping === 0 && subtotal > 0 && (
-                    <p className="text-xs text-emerald-600 pt-1">
-                      ✓ Free shipping on orders above ₹2000
-                    </p>
-                  )}
                   <div className="border-t border-border pt-3 mt-3 flex justify-between text-base">
                     <span className="font-semibold text-foreground">Grand Total</span>
                     <span className="font-bold text-[#D4AF37]">{formatCurrency(grandTotal)}</span>

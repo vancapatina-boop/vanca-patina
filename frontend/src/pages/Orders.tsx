@@ -18,7 +18,7 @@ type Order = {
   orderItems: OrderItem[];
   totalPrice: number;
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-  paymentMethod: "Razorpay";
+  paymentMethod: "Cashfree";
   paymentStatus?: "pending" | "paid" | "failed" | "refunded";
   isPaid: boolean;
   createdAt: string;

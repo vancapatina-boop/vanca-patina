@@ -6,16 +6,17 @@ export type { ShippingAddress };
 export interface CreatePaymentOrderResponse {
   appOrderId: string;
   orderId: string;
+  paymentSessionId: string;
   amount: number;
   currency: string;
-  key: string;
+  environment?: string;
 }
 
 export interface VerifyPaymentParams {
   appOrderId: string;
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
+  cashfree_order_id: string;
+  cashfree_payment_id: string;
+  cashfree_signature?: string;
 }
 
 export async function createPaymentOrder(params: { shippingAddress: ShippingAddress }) {
@@ -25,6 +26,11 @@ export async function createPaymentOrder(params: { shippingAddress: ShippingAddr
 
 export async function verifyPayment(params: VerifyPaymentParams) {
   const res = await api.post("/payment/verify", params);
+  return res.data;
+}
+
+export async function checkoutOrder(params: { shippingAddress: ShippingAddress; paymentMethod?: "COD" | "PayPal" }) {
+  const res = await api.post("/orders", params);
   return res.data;
 }
 

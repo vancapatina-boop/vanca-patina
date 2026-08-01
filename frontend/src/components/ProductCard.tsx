@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, Star, Loader } from "lucide-react";
+import { Heart, ShoppingBag, Star, Loader } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { addToWishlist } from "@/services/dashboardService";
 import { Product } from "@/types/product";
 
 const ProductCard = ({ product }: { product: Product }) => {
@@ -14,13 +15,17 @@ const ProductCard = ({ product }: { product: Product }) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+
+  const requireLogin = (message: string) => {
+    if (isAuthenticated) return false;
+    toast.error(message);
+    navigate("/login");
+    return true;
+  };
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      toast.error("Please login to add items to cart");
-      navigate("/login");
-      return;
-    }
+    if (requireLogin("Please login to add items to cart")) return;
 
     try {
       setIsLoading(true);
@@ -30,6 +35,20 @@ const ProductCard = ({ product }: { product: Product }) => {
       toast.error(getApiErrorMessage(error, "Failed to add to cart"));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddToWishlist = async () => {
+    if (requireLogin("Please login to add items to wishlist")) return;
+
+    try {
+      setIsWishlistLoading(true);
+      await addToWishlist(product.id);
+      toast.success(`${product.name} added to wishlist!`);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to add to wishlist"));
+    } finally {
+      setIsWishlistLoading(false);
     }
   };
 
@@ -71,9 +90,9 @@ const ProductCard = ({ product }: { product: Product }) => {
 
         <p className="text-xs text-muted-foreground mb-3 line-clamp-1">{product.shortDescription}</p>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-foreground">{formatCurrency(product.price)}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-bold text-foreground truncate">{formatCurrency(product.price)}</span>
             {product.originalPrice && (
               <span className="text-xs text-muted-foreground line-through">
                 {formatCurrency(product.originalPrice)}
@@ -81,13 +100,24 @@ const ProductCard = ({ product }: { product: Product }) => {
             )}
           </div>
 
-          <button
-            onClick={handleAddToCart}
-            disabled={isLoading}
-            className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleAddToWishlist}
+              disabled={isWishlistLoading}
+              className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Add to wishlist"
+            >
+              {isWishlistLoading ? <Loader className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleAddToCart}
+              disabled={isLoading}
+              className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Add to cart"
+            >
+              {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>
