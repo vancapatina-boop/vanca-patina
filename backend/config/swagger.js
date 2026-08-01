@@ -1,21 +1,26 @@
-const swaggerJsdoc = require("swagger-jsdoc");
+let swaggerSpec = { openapi: "3.0.0", info: { title: "Vanca Patina API", version: "1.0.0" }, paths: {} };
 
-const options = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Vanca Patina API",
-      version: "1.0.0",
-      description: "MERN backend APIs (auth, products, cart, orders, admin)",
-    },
-    servers: [
-      {
-        url: process.env.CLIENT_URL || "http://localhost:5173",
+try {
+  const swaggerJsdoc = require("swagger-jsdoc");
+  const options = {
+    definition: {
+      openapi: "3.0.0",
+      info: {
+        title: "Vanca Patina API",
+        version: "1.0.0",
+        description: "MERN backend APIs (auth, products, cart, orders, admin)",
       },
-    ],
-  },
-  apis: ["./routes/*.js"],
-};
+      servers: [
+        {
+          url: process.env.CLIENT_URL || "http://localhost:5173",
+        },
+      ],
+    },
+    apis: ["./routes/*.js"],
+  };
+  swaggerSpec = swaggerJsdoc(options);
+} catch (err) {
+  console.warn("Swagger JSDoc init warning:", err.message);
+}
 
-module.exports = swaggerJsdoc(options);
-
+module.exports = swaggerSpec;

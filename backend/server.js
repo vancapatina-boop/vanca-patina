@@ -9,7 +9,7 @@ const morgan = require("morgan");
 
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
-const { handleRazorpayWebhook } = require('./controllers/paymentController');
+const { handleCashfreeWebhook } = require('./controllers/paymentController');
 
 const app = express();
 
@@ -98,7 +98,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
-app.post('/api/webhook/razorpay', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
+app.post('/api/webhook/cashfree', express.raw({ type: 'application/json' }), handleCashfreeWebhook);
 app.use(express.json({ limit: "1mb" }));
 
 // DB CONNECT
@@ -109,8 +109,12 @@ const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Swagger docs
-const swaggerSpec = require("./config/swagger");
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+try {
+  const swaggerSpec = require("./config/swagger");
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+} catch (e) {
+  console.warn("Swagger UI setup warning:", e.message);
+}
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));

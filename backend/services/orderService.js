@@ -12,7 +12,10 @@ function computeTotals(cartItems) {
     name: item.product.name,
     qty: item.qty,
     image: item.product.image,
-    price: item.product.price,
+    price: Number(item.variantPrice ?? item.product.price),
+    variantKey: item.variantKey,
+    variantLabel: item.variantLabel,
+    variantSku: item.variantSku,
   }));
 
   const itemsPrice = orderItems.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -24,7 +27,7 @@ function computeTotals(cartItems) {
   return { orderItems, itemsPrice, taxPrice, shippingPrice, totalPrice };
 }
 
-async function createOrderFromCart({ user, shippingAddress, paymentMethod, razorpayOrderId = null, clearCartAfterCreation = true }) {
+async function createOrderFromCart({ user, shippingAddress, paymentMethod, cashfreeOrderId = null, clearCartAfterCreation = true }) {
   const cart = await Cart.findOne({ user: user._id }).populate('items.product');
 
   if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
@@ -59,10 +62,16 @@ async function createOrderFromCart({ user, shippingAddress, paymentMethod, razor
   // Validate all items still have sufficient stock
   for (const item of validItems) {
     const currentProduct = priceMap.get(item.product._id.toString());
-    if (!currentProduct || currentProduct.stock < item.qty) {
+    const variant = item.variantKey ? currentProduct?.variants?.[item.variantKey] : null;
+    const availableStock = variant ? Number(variant.stock ?? 0) : Number(currentProduct?.stock ?? 0);
+    if (!currentProduct || availableStock < item.qty) {
       const err = new Error(`${item.product.name} is out of stock or quantity unavailable`);
       err.statusCode = 400;
       throw err;
+    }
+    if (variant) {
+      item.variantPrice = Number(variant.salePrice ?? variant.price ?? item.variantPrice ?? 0);
+      item.variantSku = variant.sku;
     }
   }
 
@@ -73,50 +82,57 @@ async function createOrderFromCart({ user, shippingAddress, paymentMethod, razor
   try {
     // Use findByIdAndUpdate with $inc to atomically prevent race conditions
     for (const item of validItems) {
-      const updated = await Product.findByIdAndUpdate(
-        item.product._id,
-        { $inc: { stock: -item.qty } },
-        { new: true, session }
-      );
+      const update = item.variantKey
+        ? { $inc: { [`variants.${item.variantKey}.stock`]: -item.qty } }
+        : { $inc: { stock: -item.qty } };
+      const updated = await Product.findByIdAndUpdate(item.product._id, update, { new: true, session });
 
       // Verify stock didn't go negative (race condition check)
-      if (!updated || updated.stock < 0) {
+      const updatedStock = item.variantKey
+        ? Number(updated?.variants?.[item.variantKey]?.stock ?? -1)
+        : Number(updated?.stock ?? -1);
+      if (!updated || updatedStock < 0) {
         throw new Error(`${item.product.name} stock insufficient after deduction`);
       }
     }
 
-    const order = new Order({
-      user: user._id,
-      customerSnapshot: {
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-      },
-      orderItems,
-      shippingAddress,
-      paymentMethod,
-      paymentStatus: 'pending',
-      paymentGateway: razorpayOrderId
-        ? {
-            provider: 'razorpay',
-            orderId: razorpayOrderId,
-          }
-        : undefined,
-      paymentResult: {
-        status: paymentMethod === 'Razorpay' ? 'created' : 'pending',
-        email_address: user.email,
-      },
-      itemsPrice,
-      taxPrice,
-      shippingPrice,
-      totalPrice,
-      isPaid: false,
-      paidAt: null,
-      status: 'pending',
-    });
+    const createdOrderArr = await Order.create(
+      [
+        {
+          user: user._id,
+          customerSnapshot: {
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+          },
+          orderItems,
+          shippingAddress,
+          paymentMethod,
+          paymentStatus: 'pending',
+          paymentGateway: cashfreeOrderId
+            ? {
+                provider: 'cashfree',
+                orderId: cashfreeOrderId,
+              }
+            : undefined,
+          paymentResult: {
+            status: paymentMethod === 'Cashfree' ? 'created' : 'pending',
+            update_time: new Date().toISOString(),
+          },
+          itemsPrice,
+          taxPrice,
+          shippingPrice,
+          totalPrice,
+          isPaid: false,
+          paidAt: null,
+          status: 'pending',
+        },
+      ],
+      { session }
+    );
 
-    const createdOrder = await order.save({ session });
-    // Clear the cart only if requested (not for Razorpay until payment verified)
+    const createdOrder = createdOrderArr[0];
+
     if (clearCartAfterCreation) {
       cart.items = [];
       await cart.save({ session });
@@ -166,11 +182,10 @@ async function cancelOrderAndRestoreStock(orderId) {
   try {
     // Restore stock for all items in the order
     for (const item of order.orderItems) {
-      const updated = await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: item.qty } },
-        { new: true, session }
-      );
+      const update = item.variantKey
+        ? { $inc: { [`variants.${item.variantKey}.stock`]: item.qty } }
+        : { $inc: { stock: item.qty } };
+      const updated = await Product.findByIdAndUpdate(item.product, update, { new: true, session });
 
       if (!updated) {
         throw new Error(`Product ${item.product} not found`);

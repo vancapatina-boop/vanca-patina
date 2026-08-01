@@ -83,6 +83,31 @@ const productBaseSchema = z.object({
   images: z.array(z.string()).optional().nullable(),
   ratings: z.coerce.number().nonnegative().optional(),
   numReviews: z.coerce.number().int().nonnegative().optional(),
+  variants: z.union([
+    z.record(z.string(), z.object({
+      label: z.string().max(120).optional(),
+      name: z.string().max(120).optional(),
+      type: z.string().max(120).optional(),
+      sku: z.string().max(120).optional(),
+      price: z.coerce.number().nonnegative(),
+      salePrice: z.coerce.number().nonnegative().optional().nullable(),
+      stock: z.coerce.number().int().nonnegative(),
+      images: z.array(z.string()).optional(),
+      status: z.enum(["active", "inactive"]).optional(),
+    })),
+    z.array(z.object({
+      key: z.string().max(120).optional(),
+      label: z.string().max(120).optional(),
+      name: z.string().max(120).optional(),
+      type: z.string().max(120).optional(),
+      sku: z.string().max(120).optional(),
+      price: z.coerce.number().nonnegative(),
+      salePrice: z.coerce.number().nonnegative().optional().nullable(),
+      stock: z.coerce.number().int().nonnegative(),
+      images: z.array(z.string()).optional(),
+      status: z.enum(["active", "inactive"]).optional(),
+    })),
+  ]).optional(),
 });
 
 const createProductSchema = productBaseSchema.required({
@@ -124,6 +149,7 @@ const getProductsQuerySchema = z.object({
 
 const addToCartSchema = z.object({
   productId: objectIdSchema,
+  variantKey: z.string().min(1).max(100).optional(),
   qty: z
     .coerce.number({ invalid_type_error: "qty must be a number" })
     .int()
@@ -143,6 +169,7 @@ const addressSchema = z.object({
   // New split address fields
   fullName: z.string().min(2).max(200).optional().transform((s) => s?.trim()),
   phoneNumber: z.string().min(10).max(15).optional().transform((s) => s?.trim()),
+  gstNumber: z.string().max(30).optional().transform((s) => s?.trim()),
   email: z.string().email().optional().transform((s) => s?.trim().toLowerCase()),
   address1: z.string().min(3).max(300).optional().transform((s) => s?.trim()),
   address2: z.string().max(300).optional().transform((s) => s?.trim()),
@@ -160,7 +187,7 @@ const addressSchema = z.object({
 
 const checkoutSchema = z.object({
   shippingAddress: addressSchema,
-  paymentMethod: z.enum(["Razorpay"]).default("Razorpay"),
+  paymentMethod: z.enum(["COD", "PayPal", "Cashfree"]).default("COD"),
 });
 
 const createPaymentOrderSchema = z.object({
@@ -169,14 +196,22 @@ const createPaymentOrderSchema = z.object({
 
 const verifyPaymentSchema = z.object({
   appOrderId: objectIdSchema,
-  razorpay_order_id: z.string().min(1),
-  razorpay_payment_id: z.string().min(1),
-  razorpay_signature: z.string().min(1),
+  cashfree_order_id: z.string().min(1),
+  cashfree_payment_id: z.string().min(1).optional(),
+  cashfree_signature: z.string().min(1).optional(),
 });
 
 const updateOrderStatusSchema = z.object({
-  status: z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]),
-});
+  status: z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]).optional(),
+  paymentStatus: z.enum(["pending", "paid", "failed", "refunded"]).optional(),
+  trackingNumber: z.string().max(120).optional(),
+  courier: z.string().max(120).optional(),
+  shippingPartner: z.string().max(120).optional(),
+  shippingNotes: z.string().max(1000).optional(),
+  adminNotes: z.string().max(1000).optional(),
+  customerNotes: z.string().max(1000).optional(),
+  internalNotes: z.string().max(1000).optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: "No order fields provided" });
 
 const uploadProductImageSchema = z.object({
   productId: objectIdSchema,

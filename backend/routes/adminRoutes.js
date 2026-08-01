@@ -18,6 +18,7 @@ const {
   deleteUser,
 } = require('../controllers/adminController');
 const { getInvoiceForAdmin, downloadInvoiceForAdmin } = require('../controllers/invoiceController');
+const { getAdminReviews, updateAdminReview, deleteAdminReview } = require('../controllers/reviewController');
 const { protect, admin } = require('../middleware/authMiddleware');
 const validate = require('../validators/validate');
 const {
@@ -82,6 +83,14 @@ router.route('/categories')
 router.route('/categories/:category')
   .delete(protect, admin, deleteCategory);
 
+
+// ==================== REVIEWS ====================
+router.route('/reviews')
+  .get(protect, admin, getAdminReviews);
+
+router.route('/reviews/:id')
+  .put(protect, admin, updateAdminReview)
+  .delete(protect, admin, deleteAdminReview);
 // ==================== USERS ====================
 router.route('/users')
   .get(protect, admin, getAllUsers);

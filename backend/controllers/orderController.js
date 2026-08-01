@@ -1,16 +1,29 @@
 const Order = require('../models/Order');
 const asyncHandler = require('../utils/asyncHandler');
-const { cancelOrderAndRestoreStock } = require('../services/orderService');
+const { createOrderFromCart, cancelOrderAndRestoreStock } = require('../services/orderService');
 
-// @desc    Direct cart checkout disabled (Razorpay-only flow)
+// @desc    Create a direct cart order
 // @route   POST /api/orders
 // @access  Private
-const addOrderItems = asyncHandler(async (_req, res) => {
-  const err = new Error(
-    'Checkout is only available via Razorpay. Use POST /api/payment/create-order, then complete payment in the Razorpay modal.'
-  );
-  err.statusCode = 400;
-  throw err;
+const addOrderItems = asyncHandler(async (req, res) => {
+  const { shippingAddress, paymentMethod = 'COD' } = req.body;
+
+  if (paymentMethod === 'Cashfree') {
+    const err = new Error(
+      'Cashfree checkout is temporarily unavailable. Use direct checkout now or POST /api/payment/create-order when Cashfree is completed.'
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const order = await createOrderFromCart({
+    user: req.user,
+    shippingAddress,
+    paymentMethod,
+    clearCartAfterCreation: true,
+  });
+
+  res.status(201).json(order);
 });
 
 // @desc    Get order by id

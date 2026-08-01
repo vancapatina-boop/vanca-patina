@@ -7,6 +7,37 @@ const asyncHandler = require('../utils/asyncHandler');
 const { hasCloudinary, uploadToCloudinary, deleteFromCloudinary, getPublicId } = require('../config/cloudinary');
 const { ensureInvoiceForOrder } = require('../services/invoiceService');
 
+function normalizeVariants(variants) {
+  if (!variants || typeof variants !== 'object') return undefined;
+
+  const entries = Array.isArray(variants)
+    ? variants.map((variant) => [variant.key || variant.label || variant.name, variant])
+    : Object.entries(variants);
+
+  return entries.reduce((acc, [rawKey, rawVariant]) => {
+    if (!rawVariant || typeof rawVariant !== 'object') return acc;
+    const label = String(rawVariant.label || rawVariant.name || rawKey || '').trim();
+    if (!label) return acc;
+    const key = String(rawKey || label).trim();
+    const price = Number(rawVariant.price ?? 0);
+    const salePrice = rawVariant.salePrice === '' || rawVariant.salePrice == null ? undefined : Number(rawVariant.salePrice);
+    const stock = Number(rawVariant.stock ?? 0);
+    if (!Number.isFinite(price) || !Number.isFinite(stock)) return acc;
+    acc[key] = {
+      label,
+      name: String(rawVariant.name || label).trim(),
+      type: String(rawVariant.type || '').trim(),
+      sku: String(rawVariant.sku || '').trim(),
+      price,
+      salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
+      stock,
+      images: Array.isArray(rawVariant.images) ? rawVariant.images.filter(Boolean) : [],
+      status: rawVariant.status === 'inactive' ? 'inactive' : 'active',
+    };
+    return acc;
+  }, {});
+}
+
 // ==================== DASHBOARD ====================
 
 // @desc    Get Dashboard Stats
@@ -53,7 +84,17 @@ const getAllOrders = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/orders/:id
 // @access  Private/Admin
 const updateOrderStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body; // processing, shipped, delivered
+  const {
+    status,
+    paymentStatus,
+    trackingNumber,
+    courier,
+    shippingPartner,
+    shippingNotes,
+    adminNotes,
+    customerNotes,
+    internalNotes,
+  } = req.body;
   const order = await Order.findById(req.params.id);
 
   if (!order) {
@@ -71,29 +112,62 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     cancelled: [],
   };
 
-  if (order.status === status) {
-    return res.json(order);
+  const previousStatus = order.status;
+  const previousPaymentStatus = order.paymentStatus;
+
+  if (status && order.status !== status) {
+    if (!transitions[order.status].includes(status)) {
+      const err = new Error("Invalid status transition");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    order.status = status;
+    if (status === "delivered") {
+      order.isPaid = true;
+      order.paymentStatus = order.paymentStatus === 'paid' ? order.paymentStatus : 'paid';
+      order.paidAt = order.paidAt || Date.now();
+    }
+
+    if (status === "cancelled") {
+      await Promise.all(
+        order.orderItems.map((item) => {
+          const update = item.variantKey
+            ? { $inc: { [`variants.${item.variantKey}.stock`]: item.qty } }
+            : { $inc: { stock: item.qty } };
+          return Product.findByIdAndUpdate(item.product, update);
+        })
+      );
+    }
   }
 
-  if (!transitions[order.status].includes(status)) {
-    const err = new Error("Invalid status transition");
-    err.statusCode = 400;
-    throw err;
+  if (paymentStatus) {
+    order.paymentStatus = paymentStatus;
+    order.isPaid = paymentStatus === 'paid';
+    if (paymentStatus === 'paid') order.paidAt = order.paidAt || Date.now();
   }
 
-  order.status = status;
-  if (status === "delivered") {
-    order.isPaid = true;
-    order.paidAt = order.paidAt || Date.now();
-  }
+  [
+    ['trackingNumber', trackingNumber],
+    ['courier', courier],
+    ['shippingPartner', shippingPartner],
+    ['shippingNotes', shippingNotes],
+    ['adminNotes', adminNotes],
+    ['customerNotes', customerNotes],
+    ['internalNotes', internalNotes],
+  ].forEach(([field, value]) => {
+    if (value !== undefined) order[field] = value;
+  });
 
-  if (status === "cancelled") {
-    // restore stock for cancelled orders where not delivered
-    await Promise.all(
-      order.orderItems.map((item) =>
-        Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } })
-      )
-    );
+  if (previousStatus !== order.status || previousPaymentStatus !== order.paymentStatus) {
+    order.statusHistory = order.statusHistory || [];
+    order.statusHistory.push({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      note: adminNotes || internalNotes || '',
+      changedBy: req.user?._id,
+      changedAt: new Date(),
+    });
   }
 
   const updatedOrder = await order.save();
@@ -109,7 +183,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 // @route   POST /api/admin/products
 // @access  Private/Admin
 const createProduct = asyncHandler(async (req, res) => {
-  const { name, price, description, category, finishType, stock, image } = req.body;
+  const { name, price, description, category, finishType, stock, image, variants } = req.body;
 
   const productExists = await Product.findOne({ name });
   if (productExists) {
@@ -126,6 +200,7 @@ const createProduct = asyncHandler(async (req, res) => {
     finishType: finishType || "Standard",
     stock: stock || 0,
     image,
+    variants: normalizeVariants(variants),
     ratings: 0,
     numReviews: 0,
   });
@@ -137,7 +212,7 @@ const createProduct = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/products/:id
 // @access  Private/Admin
 const updateProduct = asyncHandler(async (req, res) => {
-  const { name, price, description, category, finishType, stock, image } = req.body;
+  const { name, price, description, category, finishType, stock, image, variants } = req.body;
 
   let product = await Product.findById(req.params.id);
   if (!product) {
@@ -163,6 +238,10 @@ const updateProduct = asyncHandler(async (req, res) => {
   product.finishType = finishType || product.finishType;
   product.stock = stock !== undefined ? stock : product.stock;
   product.image = image || product.image;
+  if (variants !== undefined) {
+    product.variants = normalizeVariants(variants);
+    product.markModified('variants');
+  }
 
   const updatedProduct = await product.save();
   res.json(updatedProduct);

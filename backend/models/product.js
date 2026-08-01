@@ -31,6 +31,9 @@ const productSchema = new mongoose.Schema({
     enum: ["Matte", "Glossy", "Satin", "Standard", "Antique", "Brushed", "Polished", "Textured", "Metallic", "Clear Coat"],
     default: "Standard"
   },
+  variants: {
+    type: mongoose.Schema.Types.Mixed,
+  },
   ratings: {
     type: Number,
     required: true,
@@ -43,4 +46,4 @@ const productSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model("Product", productSchema);
+module.exports = mongoose.models.Product || mongoose.model("Product", productSchema);

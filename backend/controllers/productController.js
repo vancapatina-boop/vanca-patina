@@ -4,6 +4,27 @@ const Product = require("../models/product");
 const asyncHandler = require("../utils/asyncHandler");
 const { hasCloudinary, uploadToCloudinary, deleteFromCloudinary, getPublicId } = require("../config/cloudinary");
 
+const formatProductVariants = (product) => {
+  if (product && product.variants && typeof product.variants === "object") {
+    const formattedVariants = {};
+    Object.entries(product.variants).forEach(([key, v]) => {
+      if (!v) return;
+      const stock = Number(v.stock ?? 0);
+      formattedVariants[key] = {
+        ...v,
+        key,
+        label: v.label || v.name || key,
+        price: Number(v.salePrice ?? v.price ?? 0),
+        stock,
+        isAvailable: stock > 0,
+        stockStatus: stock <= 0 ? "out_of_stock" : stock <= 3 ? "low_stock" : "in_stock",
+      };
+    });
+    product.variants = formattedVariants;
+  }
+  return product;
+};
+
 // @desc    Fetch all products with pagination, search, filters & sorting
 // @route   GET /api/products
 // @access  Public
@@ -39,7 +60,9 @@ const getProducts = asyncHandler(async (req, res) => {
     .skip(pageSize * (pageNumber - 1))
     .lean();
 
-  res.json({ products, page: pageNumber, pages: Math.ceil(total / pageSize), total });
+  const formattedProducts = products.map(formatProductVariants);
+
+  res.json({ products: formattedProducts, page: pageNumber, pages: Math.ceil(total / pageSize), total });
 });
 
 // @desc    Fetch single product
@@ -52,7 +75,7 @@ const getProductById = asyncHandler(async (req, res) => {
     err.statusCode = 404;
     throw err;
   }
-  res.json(product);
+  res.json(formatProductVariants(product));
 });
 
 // @desc    Create a product
@@ -123,20 +146,17 @@ const uploadProductImage = asyncHandler(async (req, res) => {
 
   let url;
   if (hasCloudinary) {
-    // req.file.buffer exists when using memoryStorage
     const source = req.file.buffer || req.file.path;
     const result = await uploadToCloudinary(source, {
       public_id: `product-${product._id}-${Date.now()}`,
     });
     url = result.secure_url;
 
-    // If we also have an old local file, clean it up
     if (req.file.path) fs.unlink(req.file.path, () => {});
   } else {
     url = `/uploads/${path.basename(req.file.filename || req.file.path)}`;
   }
 
-  // Persist URL in DB
   product.image = url;
   if (!Array.isArray(product.images)) product.images = [];
   product.images = [...product.images, url].slice(-10);
