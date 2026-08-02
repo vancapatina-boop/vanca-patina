@@ -31,13 +31,14 @@ type AdminProduct = {
   image?: string;
   images?: string[];
   finishType?: string;
-  variants?: Record<string, AdminProductVariant>;
+  variants?: AdminProductVariant[] | Record<string, AdminProductVariant>;
   ratings?: number;
   numReviews?: number;
 };
 
 type AdminProductVariant = {
-  label: string;
+  size?: string;
+  label?: string;
   name?: string;
   type?: string;
   sku?: string;
@@ -243,6 +244,38 @@ function variantFormToPayload(variants: VariantForm[]) {
   }, {});
 }
 
+function getVariantStock(variants: any, size: string): string {
+  if (!variants) return "N/A";
+  const sizeVar = size.toLowerCase().replace(/\s+/g, "");
+  if (Array.isArray(variants)) {
+    const found = variants.find((v: any) => {
+      const vSize = (v.size || v.label || "").toLowerCase().replace(/\s+/g, "");
+      return vSize === sizeVar;
+    });
+    return found && found.stock !== undefined ? String(found.stock) : "N/A";
+  } else if (typeof variants === "object") {
+    const foundEntry = Object.entries(variants).find(([key, val]: [string, any]) => {
+      const kSize = key.toLowerCase().replace(/\s+/g, "");
+      const labelSize = (val.label || "").toLowerCase().replace(/\s+/g, "");
+      return kSize === sizeVar || labelSize === sizeVar;
+    });
+    return foundEntry ? String(foundEntry[1].stock ?? "N/A") : "N/A";
+  }
+  return "N/A";
+}
+
+function getTotalStock(variants: any, fallbackStock: number): number {
+  if (!variants) return fallbackStock;
+  if (Array.isArray(variants)) {
+    if (variants.length === 0) return fallbackStock;
+    return variants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
+  } else if (typeof variants === "object") {
+    if (Object.keys(variants).length === 0) return fallbackStock;
+    return Object.values(variants).reduce((sum: number, v: any) => sum + (Number(v?.stock) || 0), 0);
+  }
+  return fallbackStock;
+}
+
 const emptyForm = {
   name: "",
   category: "",
@@ -400,17 +433,25 @@ const AdminDashboard = () => {
       finishType: p.finishType || "Standard",
     });
 
-    const v250 = p.variants?.["250ml"] || p.variants?.["250 ml"];
-    const v1000 = p.variants?.["1000ml"] || p.variants?.["1000 ml"];
+    const v250 = Array.isArray(p.variants)
+      ? p.variants.find((v: any) => (v.size || v.label || "").toLowerCase().replace(/\s+/g, "") === "250ml")
+      : (p.variants?.["250ml"] || p.variants?.["250 ml"]);
+    const v1000 = Array.isArray(p.variants)
+      ? p.variants.find((v: any) => (v.size || v.label || "").toLowerCase().replace(/\s+/g, "") === "1000ml")
+      : (p.variants?.["1000ml"] || p.variants?.["1000 ml"]);
+
+    const variantsLength = Array.isArray(p.variants)
+      ? p.variants.length
+      : Object.keys(p.variants ?? {}).length;
 
     setV250ml({
-      enabled: !!v250 || Object.keys(p.variants ?? {}).length === 0,
+      enabled: !!v250 || variantsLength === 0,
       price: v250 ? String(v250.price ?? "") : "",
       stock: v250 ? String(v250.stock ?? "") : "",
     });
 
     setV1000ml({
-      enabled: !!v1000 || Object.keys(p.variants ?? {}).length === 0,
+      enabled: !!v1000 || variantsLength === 0,
       price: v1000 ? String(v1000.price ?? "") : "",
       stock: v1000 ? String(v1000.stock ?? "") : "",
     });
@@ -773,15 +814,25 @@ const AdminDashboard = () => {
                     <p className="text-sm font-medium text-zinc-200 truncate">{p.name}</p>
                     <p className="text-xs text-zinc-500">
                       {p.finishType || "Standard"} | Rating {p.ratings || 0}
-                      {p.variants && Object.keys(p.variants).length > 0 ? ` | ${Object.keys(p.variants).length} variants` : ""}
+                      {p.variants && (Array.isArray(p.variants) ? p.variants.length > 0 : Object.keys(p.variants).length > 0) ? ` | ${Array.isArray(p.variants) ? p.variants.length : Object.keys(p.variants).length} variants` : ""}
                     </p>
                   </div>
                   <span className="text-xs text-zinc-400 truncate">{p.category}</span>
                   <span className="text-sm font-semibold text-zinc-200 text-right">{formatCurrency(p.price)}</span>
-                  <div className="text-center">
-                    <Badge className={`text-[10px] ${p.stock > 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
-                      {p.stock > 0 ? `${p.stock} in stock` : "Out of stock"}
+                  <div className="text-center flex flex-col items-center gap-1 py-1">
+                    {/* Total Stock Badge */}
+                    <Badge className={`text-[10px] ${getTotalStock(p.variants, p.stock) > 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
+                      {getTotalStock(p.variants, p.stock) > 0 ? `${getTotalStock(p.variants, p.stock)} in stock` : "Out of stock"}
                     </Badge>
+                    {/* Variant-wise Stocks */}
+                    <div className="flex flex-col gap-0.5 mt-0.5">
+                      <span className="text-[10px] text-zinc-400 whitespace-nowrap">
+                        250ml • {getVariantStock(p.variants, "250ml")}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 whitespace-nowrap">
+                        1000ml • {getVariantStock(p.variants, "1000ml")}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center justify-center gap-1">
                     <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-[#D4AF37]/10 text-zinc-400 hover:text-[#D4AF37] transition-colors" title="Edit">
