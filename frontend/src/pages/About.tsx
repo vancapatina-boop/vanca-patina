@@ -31,6 +31,9 @@ const About = () => (
           <p className="text-muted-foreground leading-relaxed">
             Every product is meticulously formulated in our lab and tested for consistency, safety, and stunning visual results. We believe that the beauty of aged metal shouldn't take decades — it should be accessible to every creative professional.
           </p>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            Vanca Patina is a brand of Vanca Interio, dedicated to premium metal finishing products including metal polish, patina chemicals, and restoration solutions. Our mission is to provide high-quality products for professionals, manufacturers, and hobbyists.
+          </p>
         </motion.div>
       </div>
 

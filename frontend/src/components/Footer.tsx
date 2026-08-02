@@ -49,8 +49,14 @@ const Footer = () => (
           </div>
         </div>
       </div>
-      <div className="border-t border-border mt-12 pt-8 text-center text-sm text-muted-foreground">
-        © 2026 Vanca Patina. All rights reserved.
+      <div className="border-t border-border mt-12 pt-8 text-center text-sm text-muted-foreground flex flex-col gap-1.5">
+        <p>© 2026 Vanca Patina. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground/70">
+          Vanca Patina is a brand owned and operated by Vanca Interio.
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          Vanca Patina™️ is a brand of Vanca Interio.
+        </p>
       </div>
     </div>
   </footer>
