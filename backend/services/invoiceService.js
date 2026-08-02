@@ -6,19 +6,33 @@ const { sendInvoiceEmail } = require('../utils/emailService');
 
 function getCompanyDetails() {
   return {
-    name: process.env.COMPANY_NAME || 'Vanca Patina',
-    gstNumber: process.env.COMPANY_GST_NUMBER || 'GSTIN-PLACEHOLDER',
-    address: process.env.COMPANY_ADDRESS || 'Company Address',
-    logoUrl: process.env.COMPANY_LOGO_URL || '',
-    supportEmail: process.env.COMPANY_SUPPORT_EMAIL || process.env.EMAIL_USER || 'support@example.com',
-    signatureLabel: process.env.COMPANY_SIGNATURE_LABEL || 'Digital Signature Placeholder',
+    name: 'VANCA INTERIO',
+    gstNumber: '07AAXFV5347R1ZU',
+    address: 'HOUSE NO PVT-5 PLOT NO-26 GROUND FLOOR, WHS TIMBER MARKET, BLOCK A-1, KIRTI NAGAR, Delhi - 110015',
+    stateName: 'Delhi',
+    stateCode: '07',
+    logoUrl: '',
+    supportEmail: 'vancapatina@gmail.com',
+    signatureLabel: 'Authorized Signatory',
+    bank: {
+      name: 'HDFC Bank',
+      accountNumber: '50200090364819',
+      branchIfsc: 'HDFC0000440',
+    },
+    declaration: 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
   };
 }
 
 function isInvoiceEligible(order) {
   if (!order) return false;
 
-  if (order.status === 'delivered') {
+  if (order.invoice?.invoiceNumber) {
+    return true;
+  }
+
+  const invoiceReadyStatuses = new Set(['confirmed', 'processing', 'shipped', 'delivered', 'paid']);
+  const status = String(order.status || '').trim().toLowerCase();
+  if (invoiceReadyStatuses.has(status)) {
     return true;
   }
 
@@ -106,12 +120,18 @@ function buildInvoicePayload(order) {
         'N/A',
       postalCode: order.shippingAddress?.postalCode || 'N/A',
       country: order.shippingAddress?.country || 'N/A',
+      gstNumber: order.shippingAddress?.gstNumber || '',
+      stateName: order.shippingAddress?.state || '',
+      stateCode: '',
+      phone: order.shippingAddress?.phoneNumber || order.customerSnapshot?.phone || '',
     },
     items: order.orderItems.map((item) => ({
-      name: item.name,
+      name: item.variantLabel ? `${item.name} (${item.variantLabel})` : item.name,
+      hsnSac: process.env.PRODUCT_HSN_SAC || '32089090',
       quantity: item.qty,
       unitPrice: item.price,
       total: item.price * item.qty,
+      per: 'Nos.',
     })),
     subtotal: order.itemsPrice,
     tax: order.taxPrice,
@@ -176,7 +196,7 @@ const invoiceGenerationInProgress = new Map();
 
 async function ensureInvoiceForOrder(orderOrId, { notifyCustomer = false } = {}) {
   const order =
-    typeof orderOrId === 'string'
+    typeof orderOrId === 'string' || !orderOrId?.orderItems
       ? await Order.findById(orderOrId).populate('user', 'name email phone')
       : orderOrId;
 
@@ -188,6 +208,7 @@ async function ensureInvoiceForOrder(orderOrId, { notifyCustomer = false } = {})
 
   // Hosted PDF (Cloudinary) OR already generated (on-demand PDF when Cloudinary off)
   const invoiceAlreadyDone =
+    Boolean(order.invoice?.invoiceNumber) ||
     Boolean(order.invoice?.invoiceUrl) ||
     (order.invoice?.status === 'ready' && order.invoice?.generatedAt);
 

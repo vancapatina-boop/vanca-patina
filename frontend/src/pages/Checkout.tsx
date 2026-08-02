@@ -93,7 +93,6 @@ const Checkout = () => {
     loading: cartLoading,
     error: cartError,
     orderPricing,
-    totalMl,
     syncCart,
     hydrateCartFromStorage,
   } = useCart();
@@ -627,10 +626,10 @@ const Checkout = () => {
                     <span className="font-medium text-foreground">{formatCurrency(shipping)}</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground -mt-1">
-                    Volume-based: {totalMl.toLocaleString("en-IN")} ml total. Tax is calculated on products.
+                    Fixed shipping charge. GST is calculated on products.
                   </p>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax (5%)</span>
+                    <span className="text-muted-foreground">GST (18%)</span>
                     <span className="font-medium text-foreground">{formatCurrency(tax)}</span>
                   </div>
                   <div className="border-t border-border pt-3 mt-3 flex justify-between text-base">

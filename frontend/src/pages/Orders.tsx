@@ -107,7 +107,10 @@ const Orders = () => {
           <div className="space-y-6">
             {orders.map((order) => {
               const invoiceAvailable =
-                Boolean(order.invoice?.invoiceUrl) || order.paymentStatus === "paid" || order.status === "delivered";
+                Boolean(order.invoice?.invoiceNumber) ||
+                Boolean(order.invoice?.invoiceUrl) ||
+                order.paymentStatus === "paid" ||
+                ["confirmed", "processing", "shipped", "delivered"].includes(order.status);
 
               return (
                 <div key={order._id} className="glass-card p-6">

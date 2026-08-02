@@ -104,7 +104,7 @@ const orderSchema = new mongoose.Schema({
     default: 'PENDING_PAYMENT',
   },
   invoice: {
-    invoiceNumber: { type: String, sparse: true },
+    invoiceNumber: { type: String },
     status: {
       type: String,
       enum: ['not_requested', 'ready', 'failed'],

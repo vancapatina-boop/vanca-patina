@@ -5,9 +5,8 @@ export type OrderPricing = {
   totalPrice: number;
 };
 
-const TAX_RATE = 0.05;
-const SHIPPING_PRICE = 75;
-const FREE_SHIPPING_THRESHOLD = 2000;
+export const TAX_RATE = 0.18;
+export const SHIPPING_PRICE = 200;
 
 function roundMoney(value: number) {
   return Number((Number(value) || 0).toFixed(2));
@@ -58,7 +57,7 @@ export function compareVariantKeys(a: string, b: string) {
 
 export function computeOrderPricing(itemsPrice: number, _totalMl = 0): OrderPricing {
   const normalizedItemsPrice = roundMoney(itemsPrice);
-  const shippingPrice = normalizedItemsPrice > FREE_SHIPPING_THRESHOLD || normalizedItemsPrice <= 0 ? 0 : SHIPPING_PRICE;
+  const shippingPrice = normalizedItemsPrice <= 0 ? 0 : SHIPPING_PRICE;
   const taxPrice = roundMoney(normalizedItemsPrice * TAX_RATE);
   const totalPrice = roundMoney(normalizedItemsPrice + shippingPrice + taxPrice);
 

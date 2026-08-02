@@ -9,7 +9,6 @@ const { hasCloudinary, uploadToCloudinary } = require("../config/cloudinary");
 
 const APPROVED = "approved";
 const REVIEWABLE_ORDER_STATUSES = new Set(["paid", "processing", "shipped", "delivered", "confirmed"]);
-const PUBLIC_REVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(value);
@@ -208,7 +207,25 @@ const getProductReviewSummary = asyncHandler(async (req, res) => {
 });
 
 const getReviewEligibility = asyncHandler(async (req, res) => {
-  res.json({ eligible: true, alreadyReviewed: false, eligibleOrders: [] });
+  const { id: productId } = req.params;
+  if (!isObjectId(productId)) {
+    const err = new Error("Invalid product id");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const existingReview = await Review.findOne({
+    productId,
+    userId: req.user._id,
+  }).select("_id").lean();
+
+  const eligibleOrder = await findReviewableOrder({ userId: req.user._id, productId });
+
+  res.json({
+    eligible: !existingReview,
+    alreadyReviewed: Boolean(existingReview),
+    eligibleOrders: eligibleOrder ? [eligibleOrder._id] : [],
+  });
 });
 
 const createReview = asyncHandler(async (req, res) => {
@@ -227,8 +244,8 @@ const createReview = asyncHandler(async (req, res) => {
   }
 
   const rating = Number(req.body.rating);
-  const customerName = sanitizeText(req.body.customerName || req.user?.name || "Customer", 100);
-  const customerEmail = normalizeEmail(req.body.customerEmail || req.user?.email);
+  const customerName = sanitizeText(req.user.name || req.body.customerName || "Customer", 100);
+  const customerEmail = normalizeEmail(req.user.email || req.body.customerEmail);
   const title = sanitizeText(req.body.title, 120);
   const comment = sanitizeText(req.body.comment, 3000);
 
@@ -252,11 +269,10 @@ const createReview = asyncHandler(async (req, res) => {
 
   const recentDuplicate = await Review.findOne({
     productId,
-    customerEmail,
-    createdAt: { $gte: new Date(Date.now() - PUBLIC_REVIEW_WINDOW_MS) },
+    $or: [{ userId: req.user._id }, { customerEmail }],
   }).lean();
   if (recentDuplicate) {
-    const err = new Error("You have already reviewed this product recently");
+    const err = new Error("You have already reviewed this product");
     err.statusCode = 409;
     throw err;
   }
@@ -290,7 +306,7 @@ const createReview = asyncHandler(async (req, res) => {
 
   const review = await Review.create({
     productId,
-    userId: req.user?._id,
+    userId: req.user._id,
     orderId: order?._id,
     customerName,
     customerEmail,
@@ -322,9 +338,8 @@ const updateReview = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  const customerEmail = normalizeEmail(req.body.customerEmail);
-  if (customerEmail !== review.customerEmail) {
-    const err = new Error("Use the same email used to submit this review");
+  if (!review.userId || review.userId.toString() !== req.user._id.toString()) {
+    const err = new Error("Not authorized to update this review");
     err.statusCode = 403;
     throw err;
   }
@@ -341,7 +356,8 @@ const updateReview = asyncHandler(async (req, res) => {
 
   if (req.body.title !== undefined) review.title = sanitizeText(req.body.title, 120);
   if (req.body.comment !== undefined) review.comment = sanitizeText(req.body.comment, 3000);
-  if (req.body.customerName !== undefined) review.customerName = sanitizeText(req.body.customerName, 100);
+  review.customerName = sanitizeText(req.user.name || review.customerName, 100);
+  review.customerEmail = normalizeEmail(req.user.email || review.customerEmail);
 
   await review.save();
   await recalculateProductRating(productId);

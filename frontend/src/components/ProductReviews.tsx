@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import { Link } from "react-router-dom";
 import {
   BadgeCheck,
   Camera,
@@ -153,7 +154,7 @@ const ProductReviews = ({
   productId: string;
   onRatingChange?: (rating: number, count: number) => void;
 }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [summary, setSummary] = useState<ReviewSummary>(emptySummary);
   const [page, setPage] = useState(1);
@@ -295,15 +296,20 @@ const ProductReviews = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (formRating < 1 || !customerName.trim() || !customerEmail.trim() || !title.trim() || comment.trim().length < 10) {
-      toast.error("Add your name, email, rating, title, and a detailed review");
+    if (!isAuthenticated) {
+      toast.error("Please sign in to submit a review");
+      return;
+    }
+
+    if (formRating < 1 || !title.trim() || comment.trim().length < 10) {
+      toast.error("Add a rating, title, and a detailed review");
       return;
     }
 
     const formData = new FormData();
     formData.append("rating", String(formRating));
-    formData.append("customerName", customerName.trim());
-    formData.append("customerEmail", customerEmail.trim());
+    formData.append("customerName", user?.name?.trim() || customerName.trim());
+    formData.append("customerEmail", user?.email?.trim() || customerEmail.trim());
     formData.append("title", title.trim());
     formData.append("comment", comment.trim());
     imagePreviews.forEach(({ file }) => formData.append("images", file));
@@ -353,6 +359,8 @@ const ProductReviews = ({
 
   const totalReviews = summary.totalReviews || 0;
   const activeLightboxImage = lightboxIndex !== null ? galleryImages[lightboxIndex] : "";
+  const reviewerDisplayName = user?.name?.trim() || "Your account";
+  const reviewerEmail = user?.email?.trim() || "";
 
   return (
     <section className="mt-24" id="customer-reviews">
@@ -390,9 +398,13 @@ const ProductReviews = ({
 
             <div className="mt-5 rounded-lg border border-border/70 bg-black/10 px-4 py-3">
               <p className="text-sm text-foreground">
-                {totalReviews > 0 ? `Based on ${totalReviews} Review${totalReviews === 1 ? "" : "s"}` : "No Reviews Yet"}
+                {loading
+                  ? "Loading reviews..."
+                  : totalReviews > 0
+                    ? `Based on ${totalReviews} Review${totalReviews === 1 ? "" : "s"}`
+                    : "No Reviews Yet"}
               </p>
-              {totalReviews === 0 && <p className="text-xs text-muted-foreground mt-1">Be the first to review this product.</p>}
+              {!loading && totalReviews === 0 && <p className="text-xs text-muted-foreground mt-1">Be the first to review this product.</p>}
             </div>
 
             <div className="space-y-3 mt-6">
@@ -427,34 +439,28 @@ const ProductReviews = ({
               <p className="text-sm text-muted-foreground mt-1">Share your product experience with other customers.</p>
             </div>
 
+            {!isAuthenticated ? (
+              <div className="rounded-lg border border-border/70 bg-secondary/60 p-4">
+                <p className="text-sm text-foreground">Please sign in to share your review.</p>
+                <p className="text-xs text-muted-foreground mt-1">Customer reviews can only be posted from verified accounts.</p>
+                <Link
+                  to="/login"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-lg gradient-copper px-4 py-3 text-sm font-semibold text-primary-foreground hover-glow transition-all"
+                >
+                  Sign in to Review
+                </Link>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="text-sm font-medium text-muted-foreground block mb-2">Your Rating</label>
                 <StarInput value={formRating} onChange={setFormRating} />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground block mb-2">Name</label>
-                  <input
-                    value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)}
-                    maxLength={100}
-                    placeholder="Your name"
-                    className="w-full px-4 py-3 rounded-lg bg-secondary/80 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground block mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                    maxLength={254}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 rounded-lg bg-secondary/80 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                  />
-                </div>
+              <div className="rounded-lg border border-border/70 bg-secondary/60 px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Posting as</p>
+                <p className="mt-1 text-sm font-medium text-foreground">{reviewerDisplayName}</p>
+                {reviewerEmail && <p className="text-xs text-muted-foreground">{reviewerEmail}</p>}
               </div>
 
               <div>
@@ -539,6 +545,7 @@ const ProductReviews = ({
                 {submitting ? "Submitting Review..." : "Submit Review"}
               </Button>
             </form>
+            )}
           </div>
         </div>
 

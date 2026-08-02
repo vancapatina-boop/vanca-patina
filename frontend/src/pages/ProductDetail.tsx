@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ShoppingBag, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import ProductCard from "@/components/ProductCard";
 import ProductGallery from "@/components/ProductGallery";
@@ -145,6 +145,16 @@ const ProductDetail = () => {
       setIsAddingToCart(false);
     }
   };
+
+  const handleReviewRatingChange = useCallback((rating: number, reviews: number) => {
+    setProduct((current) => {
+      if (!current || (current.rating === rating && current.reviews === reviews)) {
+        return current;
+      }
+
+      return { ...current, rating, reviews };
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -375,7 +385,7 @@ const ProductDetail = () => {
 
         <ProductReviews
           productId={product.id}
-          onRatingChange={(rating, reviews) => setProduct((current) => (current ? { ...current, rating, reviews } : current))}
+          onRatingChange={handleReviewRatingChange}
         />
       </div>
     </div>

@@ -3,6 +3,13 @@ const Cart = require('../models/Cart');
 const Order = require('../models/Order');
 const Product = require('../models/product');
 
+const TAX_RATE = 0.18;
+const SHIPPING_PRICE = 200;
+
+function roundMoney(value) {
+  return Number((Number(value) || 0).toFixed(2));
+}
+
 function computeTotals(cartItems) {
   // Filter out any items whose product was deleted from DB (populated as null)
   const validItems = cartItems.filter((item) => item.product != null);
@@ -18,11 +25,10 @@ function computeTotals(cartItems) {
     variantSku: item.variantSku,
   }));
 
-  const itemsPrice = orderItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const taxRate = Number(process.env.TAX_RATE || 0.05);
-  const shippingPrice = itemsPrice > 2000 ? 0 : 75;
-  const taxPrice = Number((itemsPrice * taxRate).toFixed(2));
-  const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
+  const itemsPrice = roundMoney(orderItems.reduce((sum, item) => sum + item.price * item.qty, 0));
+  const shippingPrice = itemsPrice <= 0 ? 0 : SHIPPING_PRICE;
+  const taxPrice = roundMoney(itemsPrice * TAX_RATE);
+  const totalPrice = roundMoney(itemsPrice + shippingPrice + taxPrice);
 
   return { orderItems, itemsPrice, taxPrice, shippingPrice, totalPrice };
 }

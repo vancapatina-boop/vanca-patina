@@ -2,6 +2,36 @@ const Order = require('../models/Order');
 const asyncHandler = require('../utils/asyncHandler');
 const { ensureInvoiceForOrder, getInvoiceAccessUrl, streamInvoicePdfToResponse } = require('../services/invoiceService');
 
+function isInvoiceConflict(error) {
+  return error?.statusCode === 409 || error?.status === 409;
+}
+
+function canStreamExistingInvoice(order) {
+  if (!order) return false;
+  if (order.invoice?.invoiceNumber) return true;
+
+  const status = String(order.status || '').trim().toLowerCase();
+  const paymentStatus = String(order.paymentStatus || '').trim().toLowerCase();
+  return paymentStatus === 'paid' || order.isPaid || ['confirmed', 'processing', 'shipped', 'delivered'].includes(status);
+}
+
+async function resolveInvoiceOrUseOrder(order) {
+  try {
+    return await ensureInvoiceForOrder(order._id);
+  } catch (error) {
+    if (isInvoiceConflict(error) && canStreamExistingInvoice(order)) {
+      console.warn('[Invoice] Eligibility conflict ignored for downloadable order', {
+        orderId: order.orderId || order._id.toString(),
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        invoiceNumber: order.invoice?.invoiceNumber,
+      });
+      return order;
+    }
+    throw error;
+  }
+}
+
 function serializeInvoice(order) {
   return {
     orderId: order._id,
@@ -31,7 +61,7 @@ const getInvoiceForUser = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  const resolvedOrder = await ensureInvoiceForOrder(order._id);
+  const resolvedOrder = await resolveInvoiceOrUseOrder(order);
   res.json(serializeInvoice(resolvedOrder));
 });
 
@@ -84,7 +114,7 @@ const downloadInvoiceForUser = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  const resolvedOrder = await ensureInvoiceForOrder(order._id);
+  const resolvedOrder = await resolveInvoiceOrUseOrder(order);
   await pipeInvoicePdf(resolvedOrder, res);
 });
 

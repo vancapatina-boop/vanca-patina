@@ -7,7 +7,7 @@ import { getVariantInfo } from "@/lib/productVariant";
 
 const Cart = () => {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeFromCart, totalPrice, loading, error } = useCart();
+  const { items, updateQuantity, removeFromCart, totalPrice, orderPricing, loading, error } = useCart();
 
   if (error) {
     return <div className="min-h-screen pt-32 text-center text-destructive">{error}</div>;
@@ -93,16 +93,20 @@ const Cart = () => {
             <h3 className="font-display text-lg font-semibold text-foreground mb-6">Order Summary</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
+                <span>Product total</span>
                 <span>{formatCurrency(totalPrice)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Shipping</span>
-                <span>Calculated at checkout</span>
+                <span>{formatCurrency(orderPricing.shippingPrice)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>GST (18%)</span>
+                <span>{formatCurrency(orderPricing.taxPrice)}</span>
               </div>
               <div className="border-t border-border pt-3 flex justify-between font-semibold text-foreground">
                 <span>Total</span>
-                <span>{formatCurrency(totalPrice)}</span>
+                <span>{formatCurrency(orderPricing.totalPrice)}</span>
               </div>
             </div>
             <button

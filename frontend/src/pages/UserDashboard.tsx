@@ -166,7 +166,12 @@ const UserDashboard = ({ initialSection = "overview" }: UserDashboardProps) => {
 
   const canDownloadInvoice = (order: Order) => {
     if (order.status === "cancelled" && order.paymentStatus !== "paid" && !order.isPaid) return false;
-    return order.paymentStatus === "paid" || order.isPaid || order.status === "delivered";
+    return (
+      Boolean(order.invoice?.invoiceNumber) ||
+      order.paymentStatus === "paid" ||
+      order.isPaid ||
+      ["confirmed", "processing", "shipped", "delivered"].includes(order.status)
+    );
   };
 
   const handleProfileSave = async (e: React.FormEvent) => {

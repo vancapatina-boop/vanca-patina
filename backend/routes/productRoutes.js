@@ -45,17 +45,18 @@ const reviewWriteLimiter = rateLimit({
 
 router.get('/:id/reviews', getProductReviews);
 router.get('/:id/reviews/summary', getProductReviewSummary);
-router.get('/:id/reviews/eligibility', getReviewEligibility);
+router.get('/:id/reviews/eligibility', protect, getReviewEligibility);
 router.post(
   '/:id/reviews',
   reviewWriteLimiter,
+  protect,
   reviewUpload.fields([
     { name: 'images', maxCount: 5 },
     { name: 'video', maxCount: 1 },
   ]),
   createReview
 );
-router.put('/:id/reviews/:reviewId', reviewWriteLimiter, updateReview);
+router.put('/:id/reviews/:reviewId', reviewWriteLimiter, protect, updateReview);
 router.patch('/:id/reviews/:reviewId/helpful', reviewWriteLimiter, markReviewHelpful);
 router.post('/:id/reviews/:reviewId/report', reviewWriteLimiter, reportReview);
 
