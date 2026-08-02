@@ -205,7 +205,28 @@ const createProduct = asyncHandler(async (req, res) => {
     numReviews: 0,
   });
 
-  res.status(201).json(product);
+  const productObj = product.toObject();
+  if (productObj.variants) {
+    if (Array.isArray(productObj.variants)) {
+      productObj.variants = productObj.variants.map(v => ({
+        size: v.size || v.label || v.name || v.key,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0)
+      }));
+    } else if (typeof productObj.variants === 'object') {
+      productObj.variants = Object.entries(productObj.variants).map(([key, v]) => ({
+        size: v.label || v.name || key,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0)
+      }));
+    } else {
+      productObj.variants = [];
+    }
+  } else {
+    productObj.variants = [];
+  }
+
+  res.status(201).json(productObj);
 });
 
 // @desc    Update product
@@ -244,7 +265,27 @@ const updateProduct = asyncHandler(async (req, res) => {
   }
 
   const updatedProduct = await product.save();
-  res.json(updatedProduct);
+  const productObj = updatedProduct.toObject();
+  if (productObj.variants) {
+    if (Array.isArray(productObj.variants)) {
+      productObj.variants = productObj.variants.map(v => ({
+        size: v.size || v.label || v.name || v.key,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0)
+      }));
+    } else if (typeof productObj.variants === 'object') {
+      productObj.variants = Object.entries(productObj.variants).map(([key, v]) => ({
+        size: v.label || v.name || key,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0)
+      }));
+    } else {
+      productObj.variants = [];
+    }
+  } else {
+    productObj.variants = [];
+  }
+  res.json(productObj);
 });
 
 // @desc    Delete product (also removes Cloudinary images)
@@ -323,10 +364,34 @@ const getAdminProducts = asyncHandler(async (req, res) => {
   const total = await Product.countDocuments();
   const products = await Product.find({})
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();
+
+  const formattedProducts = products.map(product => {
+    if (product.variants) {
+      if (Array.isArray(product.variants)) {
+        product.variants = product.variants.map(v => ({
+          size: v.size || v.label || v.name || v.key,
+          price: Number(v.price ?? 0),
+          stock: Number(v.stock ?? 0)
+        }));
+      } else if (typeof product.variants === 'object') {
+        product.variants = Object.entries(product.variants).map(([key, v]) => ({
+          size: v.label || v.name || key,
+          price: Number(v.price ?? 0),
+          stock: Number(v.stock ?? 0)
+        }));
+      } else {
+        product.variants = [];
+      }
+    } else {
+      product.variants = [];
+    }
+    return product;
+  });
 
   res.json({
-    products,
+    products: formattedProducts,
     pagination: {
       page,
       pages: Math.ceil(total / limit),
