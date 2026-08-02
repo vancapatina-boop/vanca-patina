@@ -44,6 +44,12 @@ const {
     clearCart: vi.fn(),
     totalItems: 1,
     totalPrice: 4500,
+    orderPricing: {
+      itemsPrice: 4500,
+      shippingPrice: 200,
+      taxPrice: 810,
+      totalPrice: 5510,
+    },
     loading: false,
     error: null,
     syncCart: vi.fn(),
@@ -202,6 +208,6 @@ describe("frontend smoke tests", () => {
 
     expect(screen.getByText(/order summary/i)).toBeInTheDocument();
     expect(screen.getByText("VI-07")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /pay with razorpay/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /pay securely/i })).toBeInTheDocument();
   });
 });

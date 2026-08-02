@@ -103,7 +103,25 @@ const ProductDetail = () => {
   }, [product, selectedVariantKey]);
 
   // Price & stock computations
-  const displayPrice = selectedVariant?.price ?? product?.price ?? 0;
+  const displayPrice = selectedVariant
+    ? (selectedVariant.salePrice ?? selectedVariant.price)
+    : (product?.price ?? 0);
+
+  const displayOriginalPrice = useMemo(() => {
+    if (selectedVariant) {
+      if (selectedVariant.salePrice) {
+        return selectedVariant.price;
+      }
+      return selectedVariant.price > 0 ? Math.round(selectedVariant.price * 1.2) : undefined;
+    }
+    return product?.originalPrice;
+  }, [product, selectedVariant]);
+
+  const discountPercentage = useMemo(() => {
+    if (!displayOriginalPrice || !displayPrice || displayOriginalPrice <= displayPrice) return 0;
+    return Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100);
+  }, [displayOriginalPrice, displayPrice]);
+
   const displayStock = selectedVariant ? selectedVariant.stock : product?.stock ?? 0;
   const isOutOfStock = displayStock <= 0;
   const isLowStock = displayStock > 0 && displayStock <= 3;
@@ -223,9 +241,14 @@ const ProductDetail = () => {
             {/* Price & Selected Stock Summary */}
             <div className="flex flex-wrap items-center gap-4 mt-6">
               <span className="text-3xl font-bold text-foreground">{formatCurrency(displayPrice)}</span>
-              {product.originalPrice && (
+              {displayOriginalPrice && (
                 <span className="text-lg text-muted-foreground line-through">
-                  {formatCurrency(product.originalPrice)}
+                  {formatCurrency(displayOriginalPrice)}
+                </span>
+              )}
+              {discountPercentage > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                  {discountPercentage}% OFF
                 </span>
               )}
 
