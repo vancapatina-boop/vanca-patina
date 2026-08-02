@@ -199,11 +199,12 @@ const verifyPaymentSchema = z.object({
   cashfree_order_id: z.string().min(1),
   cashfree_payment_id: z.string().min(1).optional(),
   cashfree_signature: z.string().min(1).optional(),
+  checkout_status: z.enum(["cancelled"]).optional(),
 });
 
 const updateOrderStatusSchema = z.object({
   status: z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]).optional(),
-  paymentStatus: z.enum(["pending", "paid", "failed", "refunded"]).optional(),
+  paymentStatus: z.enum(["pending", "processing", "paid", "failed", "cancelled", "refunded"]).optional(),
   trackingNumber: z.string().max(120).optional(),
   courier: z.string().max(120).optional(),
   shippingPartner: z.string().max(120).optional(),

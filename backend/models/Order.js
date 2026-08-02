@@ -47,13 +47,14 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, default: 'Cashfree' },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'paid', 'failed', 'cancelled', 'expired', 'refunded'],
+    enum: ['pending', 'processing', 'paid', 'failed', 'cancelled', 'expired', 'refunded'],
     default: 'pending',
   },
   paymentGateway: {
     provider: { type: String, default: 'cashfree' },
     environment: { type: String },
     orderId: { type: String },
+    sessionId: { type: String },
     paymentId: { type: String },
     signature: { type: String },
     webhookEventId: { type: String },

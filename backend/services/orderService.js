@@ -131,6 +131,7 @@ async function createOrderFromCart({ user, shippingAddress, paymentMethod, cashf
           totalPrice,
           isPaid: false,
           paidAt: null,
+          stockDeductedAt: new Date(),
           status: 'pending',
         },
       ],
@@ -178,7 +179,7 @@ async function cancelOrderAndRestoreStock(orderId) {
   }
 
   // Skip if already cancelled (idempotency)
-  if (order.status === 'cancelled') {
+  if (order.status === 'cancelled' && !order.stockDeductedAt) {
     return order;
   }
 
@@ -200,7 +201,8 @@ async function cancelOrderAndRestoreStock(orderId) {
 
     // Mark order as cancelled
     order.status = 'cancelled';
-    order.paymentStatus = 'refunded';
+    order.paymentStatus = order.paymentStatus === 'paid' ? 'refunded' : 'cancelled';
+    order.stockDeductedAt = null;
     await order.save({ session });
 
     await session.commitTransaction();

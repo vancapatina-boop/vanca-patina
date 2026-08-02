@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { load } from "@cashfreepayments/cashfree-js";
 import { useCart } from "@/context/CartContext";
-import { checkoutOrder, type ShippingAddress } from "@/services/ordersService";
+import { createPaymentOrder, verifyPayment, type ShippingAddress } from "@/services/ordersService";
 import { addAddress, updateAddress, getProfile } from "@/services/dashboardService";
 import type { AddressRecord } from "@/types/backend";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -191,6 +192,54 @@ const Checkout = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cashfreeOrderId = params.get("cashfree_order_id") || params.get("order_id");
+    if (!cashfreeOrderId) return;
+
+    let cancelled = false;
+    (async () => {
+      const rawPending = localStorage.getItem("vp-cashfree-pending");
+      if (!rawPending) return;
+
+      try {
+        const pending = JSON.parse(rawPending) as { appOrderId?: string; orderId?: string };
+        if (!pending.appOrderId || pending.orderId !== cashfreeOrderId) return;
+
+        setIsSubmitting(true);
+        const result = await verifyPayment({
+          appOrderId: pending.appOrderId,
+          cashfree_order_id: pending.orderId,
+        });
+
+        if (cancelled) return;
+        if (result.success) {
+          localStorage.removeItem("vp-cashfree-pending");
+          toast.success("Payment successful. Order placed.");
+          await syncCart();
+          navigate("/my-orders", { replace: true });
+          return;
+        }
+
+        setErrorMsg(result.message || "Payment was not completed");
+        toast.error(result.message || "Payment was not completed");
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setErrorMsg(getApiErrorMessage(error, "Payment verification failed"));
+        }
+      } finally {
+        if (!cancelled) {
+          window.history.replaceState(null, "", "/checkout");
+          setIsSubmitting(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, syncCart]);
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -281,10 +330,46 @@ const Checkout = () => {
         }
       }
 
-      await checkoutOrder({ shippingAddress, paymentMethod: "COD" });
-      toast.success("Order placed successfully.");
-      await syncCart();
-      navigate("/my-orders");
+      const paymentOrder = await createPaymentOrder({ shippingAddress });
+      localStorage.setItem(
+        "vp-cashfree-pending",
+        JSON.stringify({
+          appOrderId: paymentOrder.appOrderId,
+          orderId: paymentOrder.orderId,
+        })
+      );
+
+      const cashfree = await load({
+        mode: paymentOrder.environment === "production" ? "production" : "sandbox",
+      });
+
+      if (!cashfree) {
+        throw new Error("Cashfree checkout could not be loaded");
+      }
+
+      const checkoutResult = await cashfree.checkout({
+        paymentSessionId: paymentOrder.paymentSessionId,
+        redirectTarget: "_modal",
+      });
+
+      const verification = await verifyPayment({
+        appOrderId: paymentOrder.appOrderId,
+        cashfree_order_id: paymentOrder.orderId,
+        checkout_status: (checkoutResult as { error?: unknown } | undefined)?.error ? "cancelled" : undefined,
+      });
+
+      if (verification.success) {
+        localStorage.removeItem("vp-cashfree-pending");
+        toast.success("Payment successful. Order placed.");
+        await syncCart();
+        navigate("/my-orders");
+        return;
+      }
+
+      const checkoutError = (checkoutResult as { error?: { message?: string } } | undefined)?.error?.message;
+      setErrorMsg(checkoutError || verification.message || "Payment was not completed");
+      toast.error(checkoutError || verification.message || "Payment was not completed");
+      setIsSubmitting(false);
       return;
     } catch (error: unknown) {
       setErrorMsg(getApiErrorMessage(error, "Checkout failed"));
@@ -557,8 +642,8 @@ const Checkout = () => {
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <CreditCard className="w-5 h-5 text-primary flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Order Now, Pay Later</p>
-                    <p className="text-xs text-muted-foreground">Online payment is temporarily disabled while Cashfree is finalized.</p>
+                    <p className="text-sm font-medium text-foreground">Secure Online Payment</p>
+                    <p className="text-xs text-muted-foreground">Pay safely with Cashfree.</p>
                   </div>
                 </div>
               </div>
@@ -577,7 +662,7 @@ const Checkout = () => {
                 disabled={!canSubmit || isSubmitting || addressesLoading}
                 className="w-full mt-6 px-6 py-4 gradient-copper text-primary-foreground font-semibold rounded-lg hover-glow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Placing order...' : `Place Order - ${formatCurrency(grandTotal)}` }
+                {isSubmitting ? 'Processing payment...' : `Pay Securely - ${formatCurrency(grandTotal)}` }
               </button>
             </form>
           </div>

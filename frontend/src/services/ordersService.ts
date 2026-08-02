@@ -15,8 +15,9 @@ export interface CreatePaymentOrderResponse {
 export interface VerifyPaymentParams {
   appOrderId: string;
   cashfree_order_id: string;
-  cashfree_payment_id: string;
+  cashfree_payment_id?: string;
   cashfree_signature?: string;
+  checkout_status?: "cancelled";
 }
 
 export async function createPaymentOrder(params: { shippingAddress: ShippingAddress }) {
