@@ -24,10 +24,9 @@ function renderInvoiceTemplate(data) {
     .join('');
 
   // Calculate GST (9% CGST + 9% SGST = 18% total)
-  const gstRate = 0.09;
-  const cgstAmount = data.subtotal * gstRate;
-  const sgstAmount = data.subtotal * gstRate;
-  const totalTax = cgstAmount + sgstAmount;
+  const totalTax = Number(data.tax || 0);
+  const cgstAmount = Number((totalTax / 2).toFixed(2));
+  const sgstAmount = Number((totalTax - cgstAmount).toFixed(2));
 
   const invoiceDate = new Date(data.generatedAt);
   const formattedDate = invoiceDate.toLocaleDateString('en-IN', {
@@ -379,6 +378,10 @@ function renderInvoiceTemplate(data) {
               <div class="totals-value">${formatCurrency(data.subtotal)}</div>
             </div>
             <div class="totals-row">
+              <div class="totals-label">Freight & Cartage</div>
+              <div class="totals-value">${formatCurrency(data.shipping)}</div>
+            </div>
+            <div class="totals-row">
               <div class="totals-label">CGST @9%</div>
               <div class="totals-value">${formatCurrency(cgstAmount)}</div>
             </div>
@@ -388,12 +391,12 @@ function renderInvoiceTemplate(data) {
             </div>
             <div class="totals-row">
               <div class="totals-label" style="font-size: 13px;">TOTAL</div>
-              <div class="totals-value" style="font-size: 13px;">${formatCurrency(data.subtotal + totalTax)}</div>
+              <div class="totals-value" style="font-size: 13px;">${formatCurrency(data.total)}</div>
             </div>
           </div>
           
           <div class="amount-in-words">
-            Amount Chargeable (in words): ${convertNumberToWords(data.subtotal + totalTax)} Only
+            Amount Chargeable (in words): ${convertNumberToWords(data.total)} Only
           </div>
           
           <div class="tax-summary">
@@ -408,7 +411,7 @@ function renderInvoiceTemplate(data) {
             </div>
             <div class="tax-row">
               <div class="tax-cell tax-cell-label">Various</div>
-              <div class="tax-cell">${formatCurrency(data.subtotal)}</div>
+              <div class="tax-cell">${formatCurrency(data.subtotal + (data.shipping || 0))}</div>
               <div class="tax-cell">9%</div>
               <div class="tax-cell">${formatCurrency(cgstAmount)}</div>
               <div class="tax-cell">9%</div>

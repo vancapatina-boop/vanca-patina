@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ShoppingBag, ArrowLeft, ShieldCheck, Droplets, Minus, Plus, Loader, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useLayoutEffect } from "react";
 import { toast } from "sonner";
 import ProductCard from "@/components/ProductCard";
 import ProductGallery from "@/components/ProductGallery";
@@ -49,6 +49,17 @@ const ProductDetail = () => {
   const [qty, setQty] = useState(1);
   const [selectedVariantKey, setSelectedVariantKey] = useState<string | undefined>();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+
+  useLayoutEffect(() => {
+    const originalScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+    return () => {
+      window.history.scrollRestoration = originalScrollRestoration;
+    };
+  }, [id, loading]);
 
   useEffect(() => {
     let cancelled = false;

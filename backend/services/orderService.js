@@ -27,7 +27,7 @@ function computeTotals(cartItems) {
 
   const itemsPrice = roundMoney(orderItems.reduce((sum, item) => sum + item.price * item.qty, 0));
   const shippingPrice = itemsPrice <= 0 ? 0 : SHIPPING_PRICE;
-  const taxPrice = roundMoney(itemsPrice * TAX_RATE);
+  const taxPrice = roundMoney((itemsPrice + shippingPrice) * TAX_RATE);
   const totalPrice = roundMoney(itemsPrice + shippingPrice + taxPrice);
 
   return { orderItems, itemsPrice, taxPrice, shippingPrice, totalPrice };

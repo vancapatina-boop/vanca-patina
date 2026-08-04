@@ -58,7 +58,7 @@ export function compareVariantKeys(a: string, b: string) {
 export function computeOrderPricing(itemsPrice: number, _totalMl = 0): OrderPricing {
   const normalizedItemsPrice = roundMoney(itemsPrice);
   const shippingPrice = normalizedItemsPrice <= 0 ? 0 : SHIPPING_PRICE;
-  const taxPrice = roundMoney(normalizedItemsPrice * TAX_RATE);
+  const taxPrice = roundMoney((normalizedItemsPrice + shippingPrice) * TAX_RATE);
   const totalPrice = roundMoney(normalizedItemsPrice + shippingPrice + taxPrice);
 
   return {

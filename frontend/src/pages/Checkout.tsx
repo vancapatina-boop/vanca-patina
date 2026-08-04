@@ -711,7 +711,7 @@ const Checkout = () => {
                     <span className="font-medium text-foreground">{formatCurrency(shipping)}</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground -mt-1">
-                    Fixed shipping charge. GST is calculated on products.
+                    Fixed shipping charge. GST is calculated on products and shipping.
                   </p>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">GST (18%)</span>
