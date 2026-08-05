@@ -5,6 +5,8 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
 import { motion, AnimatePresence } from "framer-motion";
+import SEO from "@/components/SEO";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const sortOptions = [
   { label: "Newest", value: "newest" },
@@ -73,10 +75,34 @@ const Shop = () => {
     return result;
   }, [products, search, selectedCategory, selectedFinish, sortBy]);
 
+  const breadcrumbsItems = useMemo(() => {
+    if (selectedCategory === "All") {
+      return [{ label: "Shop" }];
+    }
+    return [
+      { label: "Shop", to: "/shop" },
+      { label: selectedCategory }
+    ];
+  }, [selectedCategory]);
+
+  const seoTitle = selectedCategory === "All" 
+    ? "Shop Premium Patina & Finishing Solutions" 
+    : `Shop ${selectedCategory} - Patina & Finishing`;
+
+  const seoDescription = selectedCategory === "All"
+    ? "Explore our collection of premium patina solutions, aging chemicals, professional finishing kits, and protective coatings for decorative metal finishes."
+    : `Browse our professional-grade ${selectedCategory} products. Meticulously formulated metal finishing solutions trusted by creative professionals.`;
+
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO
+        title={seoTitle}
+        description={seoDescription}
+        keywords={`shop patina, ${selectedCategory !== "All" ? selectedCategory.toLowerCase() + ", " : ""}metal finishing kits, protective coatings, copper ageing chemicals`}
+      />
       <div className="container mx-auto px-4 lg:px-8">
-        <SectionHeading subtitle="Collection" title="Our Products" description="Explore our premium range of patina solutions and metal finishing products" />
+        <Breadcrumbs items={breadcrumbsItems} />
+        <SectionHeading subtitle="Collection" title="Our Products" description="Explore our premium range of patina solutions and metal finishing products" isPageHeader />
 
         {loading && (
           <div className="flex justify-center items-center py-20 text-xl font-medium animate-pulse text-zinc-400">

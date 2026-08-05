@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import SEO from "@/components/SEO";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -602,6 +603,11 @@ const UserDashboard = ({ initialSection = "overview" }: UserDashboardProps) => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pt-24 pb-16">
+      <SEO
+        title="User Dashboard"
+        description="Manage your orders, profile, shipping addresses, and wishlist."
+        robots="noindex, nofollow"
+      />
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex gap-6">
           {/* ── Sidebar (desktop) ────────────────────────────────────────── */}

@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { getVariantInfo } from "@/lib/productVariant";
 import { CreditCard, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import SEO from "@/components/SEO";
 
 interface FormState extends ShippingAddress {
   fullName: string;
@@ -380,6 +381,7 @@ const Checkout = () => {
   if (!localStorage.getItem("token")) {
     return (
       <div className="min-h-screen pt-32 text-center">
+        <SEO title="Secure Checkout" description="Verify delivery details and pay securely for your metal finish orders." robots="noindex, nofollow" />
         <p className="text-muted-foreground">Please log in to checkout.</p>
         <button
           onClick={() => navigate("/login")}
@@ -398,6 +400,7 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO title="Secure Checkout" description="Verify delivery details and pay securely for your metal finish orders." robots="noindex, nofollow" />
       <div className="container mx-auto px-4 lg:px-8">
         <h1 className="text-3xl font-display font-bold text-foreground mb-8">Checkout</h1>
 

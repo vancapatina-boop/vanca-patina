@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { resetPassword } from "@/services/authService";
 import { getApiErrorMessage } from "@/lib/apiError";
+import SEO from "@/components/SEO";
 
 const getPasswordRules = (password: string) => [
   { label: "8+ characters", passes: password.length >= 8 },
@@ -56,6 +57,11 @@ const ResetPassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4 pt-32 pb-12 text-white">
+      <SEO
+        title="Reset Password"
+        description="Reset your Vanca Patina account password"
+        robots="noindex, nofollow"
+      />
       <div className="w-full max-w-lg rounded-[32px] border border-white/10 bg-white/[0.04] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
         <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">Account Recovery</p>
         <h1 className="mt-3 text-3xl font-semibold text-zinc-100">Create a New Password</h1>

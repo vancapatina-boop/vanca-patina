@@ -6,6 +6,7 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import SectionHeading from "@/components/SectionHeading";
 import { useMemo } from "react";
+import SEO from "@/components/SEO";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -34,8 +35,53 @@ const Index = () => {
     return result;
   }, [products]);
 
+  const orgSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://vancapatina.com/#organization",
+    "name": "Vanca Patina",
+    "url": "https://vancapatina.com",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://vancapatina.com/logo.png"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+91-8882359695",
+      "contactType": "customer service",
+      "email": "vancapatina@gmail.com",
+      "areaServed": "IN"
+    },
+    "sameAs": [
+      "https://facebook.com/vancapatina",
+      "https://instagram.com/vancapatina"
+    ]
+  };
+
+  const webSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://vancapatina.com/#website",
+    "name": "Vanca Patina",
+    "url": "https://vancapatina.com",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://vancapatina.com/shop?search={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   return (
     <div className="min-h-screen">
+      <SEO
+        title="Premium Patina Chemicals & Metal Finishing Solutions"
+        description="Transform ordinary metals into works of art. Vanca Patina offers premium decorative patina solutions, aging chemicals, and coatings trusted by architects and designers."
+        keywords="patina chemicals, metal finishing, copper patina solution, verdigris finish, metal aging, rust patina, Vanca Patina"
+        schema={[orgSchema, webSchema]}
+      />
     {/* Hero */}
     <section className="relative h-screen flex items-center overflow-hidden">
       <div className="absolute inset-0">

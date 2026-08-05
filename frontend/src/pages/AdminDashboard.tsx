@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import SEO from "@/components/SEO";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/apiError";
@@ -1490,6 +1491,11 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex text-zinc-200 pt-20 lg:pt-24">
+      <SEO
+        title="Admin Portal - Dashboard"
+        description="Authorized admin dashboard portal for Vanca Patina"
+        robots="noindex, nofollow"
+      />
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-white/5 bg-white/[0.02]">
         <div className="p-6 border-b border-white/5">

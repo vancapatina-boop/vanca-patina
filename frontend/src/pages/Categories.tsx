@@ -4,6 +4,8 @@ import SectionHeading from "@/components/SectionHeading";
 import { motion } from "framer-motion";
 import { Beaker, Package, Shield, Wrench, Palette, FlaskConical } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
+import SEO from "@/components/SEO";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const icons = [Beaker, Package, Shield, Wrench, Palette, FlaskConical];
 
@@ -59,11 +61,18 @@ const Categories = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO
+        title="Product Categories - Patina & Finishing Solutions"
+        description="Browse our decorative metal finishing products by category. Find premium patina solutions, protective coatings, aging chemicals, and professional kits."
+        keywords="patina categories, metal finishing solutions, rust aging chemicals, protective metal coatings"
+      />
       <div className="container mx-auto px-4 lg:px-8">
+        <Breadcrumbs items={[{ label: "Categories" }]} />
         <SectionHeading
           subtitle="Browse"
           title="Product Categories"
           description="Find the perfect solution for your metal finishing project"
+          isPageHeader
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {categories.map((cat, i) => {

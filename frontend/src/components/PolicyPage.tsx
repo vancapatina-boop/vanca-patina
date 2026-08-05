@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, Clock3, Mail, Phone } from "lucide-react";
 import SectionHeading from "@/components/SectionHeading";
+import SEO from "@/components/SEO";
 
 type PolicySection = {
   title: string;
@@ -14,6 +15,9 @@ interface PolicyPageProps {
   description: string;
   lastUpdated: string;
   sections: PolicySection[];
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
 }
 
 const fadeUp = {
@@ -29,13 +33,22 @@ const PolicyPage = ({
   description,
   lastUpdated,
   sections,
+  seoTitle,
+  seoDescription,
+  seoKeywords,
 }: PolicyPageProps) => (
   <div className="min-h-screen pt-24 pb-16">
+    <SEO
+      title={seoTitle || title}
+      description={seoDescription || description}
+      keywords={seoKeywords}
+    />
     <div className="container mx-auto px-4 lg:px-8">
       <SectionHeading
         subtitle={eyebrow}
         title={title}
         description={description}
+        isPageHeader
       />
 
       <motion.div

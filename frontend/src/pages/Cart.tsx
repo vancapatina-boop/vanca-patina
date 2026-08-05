@@ -4,22 +4,34 @@ import { motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getVariantInfo } from "@/lib/productVariant";
+import SEO from "@/components/SEO";
 
 const Cart = () => {
   const navigate = useNavigate();
   const { items, updateQuantity, removeFromCart, totalPrice, orderPricing, loading, error } = useCart();
 
   if (error) {
-    return <div className="min-h-screen pt-32 text-center text-destructive">{error}</div>;
+    return (
+      <div className="min-h-screen pt-32 text-center text-destructive">
+        <SEO title="Shopping Cart" description="View your shopping cart" robots="noindex, nofollow" />
+        {error}
+      </div>
+    );
   }
 
   if (loading && items.length === 0) {
-    return <div className="min-h-screen pt-32 text-center text-muted-foreground">Loading your cart...</div>;
+    return (
+      <div className="min-h-screen pt-32 text-center text-muted-foreground">
+        <SEO title="Shopping Cart" description="View your shopping cart" robots="noindex, nofollow" />
+        Loading your cart...
+      </div>
+    );
   }
 
   if (items.length === 0) {
     return (
       <div className="min-h-screen pt-32 text-center">
+        <SEO title="Shopping Cart" description="View your shopping cart" robots="noindex, nofollow" />
         <ShoppingBag className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-2xl font-display font-bold text-foreground">Your cart is empty</h2>
         <p className="text-muted-foreground mt-2 mb-6">Add some premium products to get started.</p>
@@ -35,6 +47,7 @@ const Cart = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO title="Shopping Cart" description="View your shopping cart" robots="noindex, nofollow" />
       <div className="container mx-auto px-4 lg:px-8">
         <h1 className="text-3xl font-display font-bold text-foreground mb-8">Shopping Cart</h1>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

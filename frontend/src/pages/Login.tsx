@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { getApiErrorMessage } from "@/lib/apiError";
+import SEO from "@/components/SEO";
 
 interface LoginProps {
   defaultMode?: "login" | "signup";
@@ -101,6 +102,11 @@ const Login = ({ defaultMode = "login" }: LoginProps) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden px-4 pt-32 pb-12 selection:bg-primary/30">
+      <SEO
+        title={isSignup ? "Register" : "Login"}
+        description={isSignup ? "Register a new account on Vanca Patina" : "Sign in to your Vanca Patina account"}
+        robots="noindex, nofollow"
+      />
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-primary/10 blur-[100px]" />
         <div className="absolute bottom-1/4 -right-32 w-96 h-96 rounded-full bg-accent/10 blur-[100px]" />

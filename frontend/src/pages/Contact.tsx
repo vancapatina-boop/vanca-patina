@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { motion } from "framer-motion";
 import SectionHeading from "@/components/SectionHeading";
+import SEO from "@/components/SEO";
 
 const Contact = () => {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -13,8 +14,13 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO
+        title="Contact Us - Technical Support"
+        description="Get in touch with Vanca Patina. Have a question about our patina solutions or metal finishing products? Contact our Delhi office for expert support."
+        keywords="contact vanca patina, patina support, metal finishing customer service, patina wholesale india"
+      />
       <div className="container mx-auto px-4 lg:px-8">
-        <SectionHeading subtitle="Get in Touch" title="Contact Us" description="Have a question about our products? We'd love to hear from you." />
+        <SectionHeading subtitle="Get in Touch" title="Contact Us" description="Have a question about our products? We'd love to hear from you." isPageHeader />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>

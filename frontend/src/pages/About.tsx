@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import SectionHeading from "@/components/SectionHeading";
 import heroImage from "@/assets/hero-patina.jpg";
+import SEO from "@/components/SEO";
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -11,8 +12,13 @@ const fadeUp = {
 
 const About = () => (
   <div className="min-h-screen pt-24 pb-16">
+    <SEO
+      title="About Us - Our Story"
+      description="Learn about Vanca Patina, India's leading brand for decorative metal aging solutions, patina chemicals, finishing kits, and protective coatings."
+      keywords="about vanca patina, vanca interio, metal restoration solutions, patina chemicals india"
+    />
     <div className="container mx-auto px-4 lg:px-8">
-      <SectionHeading subtitle="Our Story" title="About Vanca Patina" />
+      <SectionHeading subtitle="Our Story" title="About Vanca Patina" isPageHeader />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto mb-24">
         <motion.div {...fadeUp}>

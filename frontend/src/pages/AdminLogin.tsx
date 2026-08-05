@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import api from "@/services/api";
+import SEO from "@/components/SEO";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -55,6 +56,11 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden px-4">
+      <SEO
+        title="Admin Portal - Login"
+        description="Authorized admin access portal for Vanca Patina"
+        robots="noindex, nofollow"
+      />
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/3 -left-40 w-[500px] h-[500px] rounded-full bg-accent/5 blur-3xl" />
         <div className="absolute bottom-1/3 -right-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl" />

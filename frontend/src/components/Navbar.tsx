@@ -63,17 +63,17 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-5 text-muted-foreground">
-            <Link to="/shop" className="hover:text-primary transition-colors hover:scale-110 duration-300">
+            <Link to="/shop" className="hover:text-primary transition-colors hover:scale-110 duration-300" aria-label="Search Products">
               <Search className="w-[1.15rem] h-[1.15rem]" />
             </Link>
 
             {!isAuthenticated ? (
-              <Link to="/login" className="hover:text-primary transition-colors hover:scale-110 duration-300">
+              <Link to="/login" className="hover:text-primary transition-colors hover:scale-110 duration-300" aria-label="User Account Login">
                 <User className="w-[1.15rem] h-[1.15rem]" />
               </Link>
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger className="outline-none hover:text-primary transition-all hover:scale-110 duration-300">
+                <DropdownMenuTrigger className="outline-none hover:text-primary transition-all hover:scale-110 duration-300" aria-label="User Account Menu">
                   <User className="w-[1.15rem] h-[1.15rem]" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 bg-background/95 backdrop-blur-lg border-border/50 mt-2 shadow-xl shadow-black/10">
@@ -103,7 +103,7 @@ const Navbar = () => {
               </DropdownMenu>
             )}
 
-            <Link to="/cart" className="relative hover:text-primary transition-colors hover:scale-110 duration-300">
+            <Link to="/cart" className="relative hover:text-primary transition-colors hover:scale-110 duration-300" aria-label="Shopping Cart">
               <ShoppingBag className="w-[1.15rem] h-[1.15rem]" />
               {totalItems > 0 && (
                 <span className="absolute -top-2 -right-2 w-[1.125rem] h-[1.125rem] rounded-full gradient-copper flex items-center justify-center text-[10px] font-bold text-primary-foreground">
@@ -114,6 +114,7 @@ const Navbar = () => {
             <button
               className="md:hidden hover:text-primary transition-colors hover:scale-110 duration-300 ml-1"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? "Close Menu" : "Open Menu"}
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>

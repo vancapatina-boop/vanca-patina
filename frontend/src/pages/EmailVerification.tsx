@@ -4,6 +4,7 @@ import { CheckCircle2, Mail, RefreshCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resendVerificationEmail } from "@/services/authService";
 import { getApiErrorMessage } from "@/lib/apiError";
+import SEO from "@/components/SEO";
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
@@ -45,6 +46,11 @@ const EmailVerification = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] px-4 pt-32 pb-16 text-white">
+      <SEO
+        title="Email Verification"
+        description="Verify your email address for Vanca Patina"
+        robots="noindex, nofollow"
+      />
       <div className="mx-auto max-w-2xl rounded-[32px] border border-white/10 bg-white/[0.04] p-8 sm:p-10 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
         <div className="flex items-center gap-3 text-[#D4AF37]">
           {isSuccess ? <CheckCircle2 className="h-10 w-10" /> : isPending ? <Mail className="h-10 w-10" /> : <XCircle className="h-10 w-10" />}

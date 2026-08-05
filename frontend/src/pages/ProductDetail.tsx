@@ -15,6 +15,8 @@ import { getApiErrorMessage } from "@/lib/apiError";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { mapBackendProduct } from "@/lib/mapBackendProduct";
 import api from "@/services/api";
+import SEO from "@/components/SEO";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const renderDescription = (text: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -185,6 +187,102 @@ const ProductDetail = () => {
     });
   }, []);
 
+  const breadcrumbItems = useMemo(() => {
+    if (!product) return [];
+    const items = [{ label: "Shop", to: "/shop" }];
+    if (product.category) {
+      items.push({
+        label: product.category,
+        to: `/shop?category=${encodeURIComponent(product.category)}`
+      });
+    }
+    items.push({ label: product.name });
+    return items;
+  }, [product]);
+
+  const productSchema = useMemo(() => {
+    if (!product) return null;
+    const schema: Record<string, any> = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": product.name,
+      "image": product.images && product.images.length > 0 
+        ? product.images.map((img) => img.startsWith("http") ? img : window.location.origin + img) 
+        : [product.image.startsWith("http") ? product.image : window.location.origin + product.image],
+      "description": product.shortDescription || product.description,
+      "brand": {
+        "@type": "Brand",
+        "name": "Vanca Patina"
+      },
+      "sku": product.sku || product.id,
+      "offers": {
+        "@type": "Offer",
+        "url": window.location.href,
+        "priceCurrency": "INR",
+        "price": displayPrice,
+        "availability": isOutOfStock ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+        "itemCondition": "https://schema.org/NewCondition"
+      }
+    };
+
+    if (product.reviews > 0 && product.rating > 0) {
+      schema.aggregateRating = {
+        "@type": "AggregateRating",
+        "ratingValue": product.rating,
+        "reviewCount": product.reviews
+      };
+    }
+    return schema;
+  }, [product, displayPrice, isOutOfStock]);
+
+  const breadcrumbSchema = useMemo(() => {
+    if (!product) return null;
+    const elements = [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://vancapatina.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Shop",
+        "item": "https://vancapatina.com/shop"
+      }
+    ];
+
+    let currentPos = 3;
+    if (product.category) {
+      elements.push({
+        "@type": "ListItem",
+        "position": currentPos++,
+        "name": product.category,
+        "item": `https://vancapatina.com/shop?category=${encodeURIComponent(product.category)}`
+      });
+    }
+
+    elements.push({
+      "@type": "ListItem",
+      "position": currentPos,
+      "name": product.name,
+      "item": `https://vancapatina.com/product/${product.id}`
+    });
+
+    return {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": elements
+    };
+  }, [product]);
+
+  const seoSchemas = useMemo(() => {
+    const list = [];
+    if (productSchema) list.push(productSchema);
+    if (breadcrumbSchema) list.push(breadcrumbSchema);
+    return list;
+  }, [productSchema, breadcrumbSchema]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-32">
@@ -216,13 +314,23 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO
+        title={product.name}
+        description={product.shortDescription || product.description.slice(0, 155)}
+        keywords={`${product.name}, ${product.category}, ${product.finishType}, patina finish`}
+        ogImage={product.image}
+        schema={seoSchemas}
+      />
       <div className="container mx-auto px-4 lg:px-8">
-        <Link
-          to="/shop"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Shop
-        </Link>
+        <div className="flex flex-col gap-4 mb-8">
+          <Link
+            to="/shop"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Shop
+          </Link>
+          <Breadcrumbs items={breadcrumbItems} />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Gallery */}
